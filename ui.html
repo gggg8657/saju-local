@@ -1,0 +1,173 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>팀 밸런스 맵</title>
+<style>
+:root{--bg:#EEF0F4;--card:#FFFFFF;--fg:#14181F;--mut:#6B7280;--line:#DDE1E8;--acc:#2B4C7E;--soft:#F5F6F9;
+ --mok:#3E8E5A;--hwa:#D6453D;--to:#D9A62E;--geum:#8C96A0;--su:#2B4C7E}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0E1218;--card:#171C25;--fg:#E8EBF0;--mut:#8B93A1;--line:#262D39;--acc:#7FA7E0;--soft:#1E2530;--geum:#A9B2BC;--su:#5B85C4}}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 "Pretendard","Apple SD Gothic Neo",system-ui,"Malgun Gothic",sans-serif;font-variant-numeric:tabular-nums}
+header{max-width:1000px;margin:0 auto;padding:28px 16px 8px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+h1{margin:0;font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1.1}h1 small{display:block;font-size:13px;font-weight:500;color:var(--mut);letter-spacing:0;margin-top:6px}
+.pill{font-size:12px;padding:5px 10px;border-radius:99px;border:1px solid var(--line);background:var(--card);color:var(--mut);display:inline-flex;align-items:center;gap:6px}.pill i{width:8px;height:8px;border-radius:50%;background:var(--geum)}.pill.on i{background:var(--mok)}
+nav{max-width:1000px;margin:12px auto 0;padding:0 16px;display:flex;gap:2px;overflow-x:auto}
+nav button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;color:var(--mut);cursor:pointer;font-size:15px;white-space:nowrap}nav button.on{color:var(--fg);border-color:var(--fg);font-weight:700}nav button:focus-visible{outline:2px solid var(--acc);outline-offset:-2px}
+main{max-width:1000px;margin:0 auto;padding:20px 16px 60px}section{display:none}section.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:14px}
+.card h2{margin:0 0 12px;font-size:17px;font-weight:700;letter-spacing:-.01em}
+label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px;font-weight:600}
+input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--fg);font-size:15px;font-family:inherit}input:focus,select:focus{outline:2px solid var(--acc);outline-offset:-1px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:640px){.two{grid-template-columns:1fr}}
+button.p{background:var(--fg);color:var(--bg);border:0;padding:11px 18px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;margin-top:14px;font-family:inherit}button.p.d{background:var(--hwa);color:#fff}button.p.g{background:var(--soft);color:var(--fg);border:1px solid var(--line)}button.p:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;font-size:12px;background:var(--soft);border:1px solid var(--line);margin:2px 4px 2px 0;font-weight:600}.tag i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.err{color:var(--hwa);font-size:13px}.mut{color:var(--mut);font-size:13px}
+.ax{display:grid;grid-template-columns:64px 1fr 1fr 1fr;gap:4px;align-items:center;font-size:13px;margin:4px 0}.ax label{margin:0;text-align:center;cursor:pointer;padding:6px 4px;border:1px solid var(--line);border-radius:6px;color:var(--fg);font-weight:500}.ax input{position:absolute;opacity:0;width:0}.ax input:checked+span{font-weight:700;color:var(--acc)}.ax label:has(input:checked){background:var(--soft);border-color:var(--acc)}
+.chips label{display:inline-block;margin:3px 4px 3px 0;padding:5px 12px;border:1px solid var(--line);border-radius:99px;cursor:pointer;font-size:13px;color:var(--fg);font-weight:500}.chips input{position:absolute;opacity:0;width:0}.chips label:has(input:checked){background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.hero{display:grid;grid-template-columns:220px 1fr;gap:20px;align-items:center}@media(max-width:640px){.hero{grid-template-columns:1fr}}
+.big{font-size:38px;font-weight:800;letter-spacing:-.03em;line-height:1}.stars{color:var(--to);font-size:20px;letter-spacing:2px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px}.grid3>div{background:var(--soft);border-radius:10px;padding:14px}.grid3 b{display:block;font-size:12px;color:var(--mut);margin-bottom:6px;font-weight:600}
+.m{display:grid;grid-template-columns:56px 1fr auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}.m:last-child{border:0}.m .sc{font-size:26px;font-weight:800;letter-spacing:-.03em}
+canvas{width:100%;background:var(--card);border:1px solid var(--line);border-radius:14px;display:block}
+.b{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.b h3{margin:0 0 4px;font-size:19px;font-weight:800;letter-spacing:-.02em}
+.pz{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}.pz .h{font-size:12px;color:var(--mut);font-weight:600}.pz .g{font-size:34px;font-weight:800;letter-spacing:.02em;line-height:1.1}.pz .s{font-size:12px;color:var(--mut)}.pz>div{background:var(--soft);border-radius:10px;padding:10px 4px}
+.du{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:6px}.du>div{border:1px solid var(--line);border-radius:8px;padding:8px 4px;text-align:center;font-size:12px;color:var(--mut)}.du b{display:block;font-size:18px;color:var(--fg);letter-spacing:.02em}.du .cur{border-color:var(--acc);background:var(--soft)}
+footer{max-width:1000px;margin:0 auto;padding:16px;color:var(--mut);font-size:12px;border-top:1px solid var(--line)}
+@media(prefers-reduced-motion:no-preference){.radar polygon.v{transition:points .4s}}
+</style></head><body>
+<header><h1>팀 밸런스 맵<small>워크숍용 협업 스타일 지도 · 동양 고전 분류 + MBTI + 별자리 + 혈액형 · 재미로 보는 것, 인사평가와 무관</small></h1><span class="pill" id="llm"><i></i>LLM 확인 중</span></header>
+<nav><button data-t="reg" class="on">등록</button><button data-t="me">나 · 오늘</button><button data-t="match">매칭</button><button data-t="map">팀 맵</button><button data-t="bungae">번개 ⚡</button></nav>
+<main>
+<section id="reg" class="on"><div class="card"><h2>내 정보 등록</h2>
+<p class="mut">생년월일시는 저장하지 않습니다. 계산된 성향 분포와 일주만 남고, 전사 매칭에서는 별명으로만 보입니다.</p>
+<div class="row"><div><label>이름</label><input id="name"></div><div><label>부서(팀)</label><input id="dept"></div></div>
+<div class="row"><div><label>생년</label><input id="year" type="number" placeholder="1990"></div><div><label>월</label><input id="month" type="number" min="1" max="12"></div><div><label>일</label><input id="day" type="number" min="1" max="31"></div>
+<div><label>출생 시</label><select id="hour"><option value="unknown">모름</option></select></div><div><label>분</label><input id="minute" type="number" min="0" max="59" value="0"></div></div>
+<div class="row"><div><label>MBTI (선택)</label><input id="mbti" placeholder="INTJ" maxlength="4"></div><div><label>혈액형 (선택)</label><select id="blood"><option value="">안 씀</option><option>A</option><option>B</option><option>O</option><option>AB</option></select></div>
+<div><label>성별 (선택 · 대운 계산에만 씀, 저장 안 함)</label><select id="gender"><option value="">안 씀</option><option value="M">남</option><option value="F">여</option></select></div></div>
+<div id="prefs_reg"></div>
+<label style="display:flex;gap:8px;align-items:center;margin-top:14px;font-weight:500;font-size:14px;color:var(--fg)"><input type="checkbox" id="consent" checked style="width:auto"> 전사 익명 매칭에 포함 (별명·부서·연령대만 노출)</label>
+<button class="p" onclick="register()">등록</button> <span id="regmsg" class="err"></span>
+</div><div id="regout"></div></section>
+
+<section id="me"><div id="today"></div><div id="meout"><div class="card">등록 후 볼 수 있어요.</div></div><div id="reading"></div><div id="saju"></div>
+<div class="card"><h2>취미 · 성향 수정</h2><div id="prefs_me"></div><button class="p" onclick="savePrefs()">저장</button> <span id="prefmsg" class="mut"></span></div>
+<button class="p d" onclick="del()">내 데이터 삭제</button></section>
+
+<section id="match"><div class="card"><h2>누구와 잘 맞을까</h2>
+<div class="row"><div><label>범위</label><select id="scope"><option value="all">회사 전체 (익명)</option><option value="dept">우리 팀 (실명)</option></select></div>
+<div><label>연령대</label><select id="f_age"><option value="">전체</option><option>20대</option><option>30대</option><option>40대</option><option>50대</option><option>60대</option></select></div>
+<div><label>MBTI</label><input id="f_mbti" placeholder="전체"></div><div><label>핵심 성향</label><select id="f_el"><option value="">전체</option><option value="목">목 · 기획</option><option value="화">화 · 추진</option><option value="토">토 · 조율</option><option value="금">금 · 원칙</option><option value="수">수 · 유연</option></select></div></div>
+<button class="p" onclick="doMatch()">찾기</button> <span id="matchmsg" class="err"></span></div><div id="matchout" class="card" style="display:none"></div></section>
+
+<section id="bungae"><div class="card"><h2>번개 치기</h2>
+<div class="row"><div><label>제목</label><input id="b_title" placeholder="볼링 칠 사람!"></div><div><label>장소</label><input id="b_place" placeholder="신탄진"></div>
+<div><label>언제</label><select id="b_min"><option value="30">30분 뒤</option><option value="60" selected>1시간 뒤</option><option value="120">2시간 뒤</option><option value="180">3시간 뒤</option><option value="360">6시간 뒤</option><option value="1440">내일 이 시간</option><option value="2880">모레</option></select></div>
+<div><label>취미 태그</label><select id="b_hobby"></select></div><div><label>정원</label><input id="b_cap" type="number" value="4" min="2" max="30"></div></div>
+<p class="mut">취미가 같고, 내가 원하는 성향 ↔ 상대 성향 / 상대가 원하는 성향 ↔ 내 성향이 어긋나지 않는 사람에게만 보입니다. "같이 놀고 싶은 성향"은 꼭 필요한 축만 고르세요.</p>
+<button class="p" onclick="makeBungae()">번개 치기</button> <span id="bmsg" class="err"></span></div>
+<div id="blist"></div></section>
+
+<section id="map"><div class="card"><div class="hero"><div id="balance_r"></div><div><div class="row"><div><label>부서</label><select id="g_dept"><option value="">회사 전체 (익명)</option></select></div></div><div id="balance"></div>
+<p class="mut" style="margin-top:10px">오각형은 팀의 성향 총합. 이웃한 꼭짓점끼리는 서로 힘을 보태는 관계(상생), 마주보는 꼭짓점은 긴장 관계(상극)입니다.</p></div></div></div>
+<div class="mut" style="display:flex;gap:14px;flex-wrap:wrap;margin:0 0 8px 4px" id="legend"></div><canvas id="cv" height="560" style="height:560px"></canvas><div id="mapinfo" class="card mut">노드를 클릭하면 관계가 보입니다. 선이 짧고 진할수록 잘 맞는 조합입니다.</div></section>
+</main>
+<footer>팀빌딩·워크숍용 도구입니다. 사주 8자는 절기 기반으로 계산하고, 궁합은 규칙 점수, 문장은 로컬 LLM이 씁니다. 과학적 근거는 없습니다.</footer>
+<script>
+const $=s=>document.querySelector(s), api=async(u,b)=>{const r=await fetch(u,b?{method:'POST',body:JSON.stringify(b)}:{});const j=await r.json();if(j.error)throw new Error(j.error);return j};
+const EL=['목','화','토','금','수'],ELW={목:'기획·성장',화:'추진·표현',토:'조율·안정',금:'원칙·분석',수:'유연·지식'},ELC={목:'var(--mok)',화:'var(--hwa)',토:'var(--to)',금:'var(--geum)',수:'var(--su)'},TENW={비겁:'협업',식상:'창의',재성:'실행',관성:'규율',인성:'학습'};
+const cssc=v=>getComputedStyle(document.documentElement).getPropertyValue(v.slice(4,-1)).trim();
+let me=JSON.parse(localStorage.tbm||'null'),META=null;const HASH=location.hash.slice(1);
+{const q=new URLSearchParams(location.search);if(q.get('id')&&q.get('token')){me={id:q.get('id'),token:q.get('token'),name:q.get('name')||'',dept:q.get('dept')||'',alias:q.get('alias')||''};localStorage.tbm=JSON.stringify(me);history.replaceState(null,'',location.pathname)}}
+for(let h=0;h<24;h++)$('#hour').insertAdjacentHTML('beforeend',`<option value="${h}">${h}시</option>`);
+// ── 오행 오각형 레이더 (SVG) ──
+function radar(els,size=200,label=true,color){const c=size/2,r=size*(label?0.31:0.44),max=Math.max(...EL.map(e=>els[e]||0),1);
+ const pt=(i,k)=>{const a=-Math.PI/2+i*2*Math.PI/5;return[c+Math.cos(a)*r*k,c+Math.sin(a)*r*k]};
+ const ring=k=>EL.map((_,i)=>pt(i,k).join(',')).join(' ');
+ const val=EL.map((e,i)=>pt(i,(els[e]||0)/max).join(',')).join(' ');
+ return `<svg class="radar" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="overflow:visible" role="img" aria-label="성향 오각형">
+ ${[.33,.66,1].map(k=>`<polygon points="${ring(k)}" fill="none" stroke="var(--line)" stroke-width="1"/>`).join('')}
+ ${EL.map((e,i)=>`<line x1="${c}" y1="${c}" x2="${pt(i,1)[0]}" y2="${pt(i,1)[1]}" stroke="var(--line)"/>`).join('')}
+ <polygon class="v" points="${val}" fill="${color||'var(--acc)'}" fill-opacity=".28" stroke="${color||'var(--acc)'}" stroke-width="2" stroke-linejoin="round"/>
+ ${EL.map((e,i)=>{const[x,y]=pt(i,(els[e]||0)/max);return`<circle cx="${x}" cy="${y}" r="3.5" fill="${ELC[e]}"/>`}).join('')}
+ ${label?EL.map((e,i)=>{const[x,y]=pt(i,1.36);return`<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${size*0.06}" font-weight="700" fill="${ELC[e]}">${e} ${ELW[e].split('·')[0]}<tspan fill="var(--mut)" font-weight="500"> ${els[e]||0}</tspan></text>`}).join(''):''}</svg>`}
+const tag=(e,t)=>`<span class="tag"><i style="background:${ELC[e]}"></i>${t}</span>`;
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button,section').forEach(x=>x.classList.remove('on'));b.classList.add('on');$('#'+b.dataset.t).classList.add('on');({me:showMe,map:loadMap,bungae:loadBungae})[b.dataset.t]?.()});
+const prefsHTML=(pre,cur={})=>`<label>취미 (복수 선택)</label><div class="chips">${META.hobbies.map(h=>`<label><input type="checkbox" name="${pre}_h" value="${h}" ${(cur.hobbies||[]).includes(h)?'checked':''}><span>${h}</span></label>`).join('')}</div>
+<div class="two"><div><label>내 성향</label>${axes(pre+'_t',cur.traits)}</div><div><label>같이 놀고 싶은 사람 성향</label>${axes(pre+'_w',cur.wants)}</div></div>`;
+const axes=(n,cur={})=>META.axes.map(a=>`<div class="ax"><span class="mut">${a}</span>${[-1,0,1].map(v=>`<label><input type="radio" name="${n}_${a}" value="${v}" ${(cur[a]||0)===v?'checked':''}><span>${v===0?'상관없음':META.labels[a][v===-1?0:1]}</span></label>`).join('')}</div>`).join('');
+const readPrefs=pre=>({hobbies:[...document.querySelectorAll(`input[name=${pre}_h]:checked`)].map(x=>x.value),
+ traits:Object.fromEntries(META.axes.map(a=>[a,+(document.querySelector(`input[name=${pre}_t_${a}]:checked`)?.value||0)])),
+ wants:Object.fromEntries(META.axes.map(a=>[a,+(document.querySelector(`input[name=${pre}_w_${a}]:checked`)?.value||0)]))});
+api('/api/meta').then(async m=>{META=m;$('#prefs_reg').innerHTML=prefsHTML('r');
+ if(me){try{Object.assign(me,await api(`/api/me?id=${me.id}&token=${me.token}`));localStorage.tbm=JSON.stringify(me);$('#prefs_me').innerHTML=prefsHTML('m',me)}catch(e){localStorage.removeItem('tbm');me=null}}});
+api('/api/status').then(s=>{const p=$('#llm');p.classList.toggle('on',s.llm);p.innerHTML=`<i></i>${s.llm?`LLM 연결됨 · ${s.model}${s.model_found===false?' (모델 없음)':''}`:'LLM 미연결 · 규칙 문장으로 대체'}`});
+const prof=(p,title)=>`<div class="card"><h2>${title}</h2><div class="hero">${radar(p.elements,220,true,ELC[p.dm_el])}<div>
+ <div style="margin-bottom:10px">${tag(p.dm_el,`핵심 ${p.dm_el} · ${ELW[p.dm_el]}`)}<span class="tag">${p.strength==='신강'?'에너지 밖으로':'에너지 안으로'}</span>${p.mbti?`<span class="tag">${p.mbti}</span>`:''}${p.zodiac?`<span class="tag">${p.zodiac}자리</span>`:''}${p.blood?`<span class="tag">${p.blood}형</span>`:''}</div>
+ <label>팀에서의 역할 분포</label><div>${Object.entries(p.ten_gods).map(([k,v])=>`<span class="tag">${TENW[k]} <b>${v}</b></span>`).join('')}</div>
+ ${p.lacking?.length?`<p class="mut" style="margin:10px 0 0">비어 있는 성향: ${p.lacking.map(e=>`${e} ${ELW[e]}`).join(', ')} — 이걸 가진 사람과 붙으면 균형이 맞습니다.</p>`:''}</div></div></div>`;
+async function register(){$('#regmsg').textContent='';const g=id=>$('#'+id).value;
+ try{const r=await api('/api/register',{name:g('name'),dept:g('dept'),year:g('year'),month:g('month'),day:g('day'),hour:g('hour'),minute:g('minute'),mbti:g('mbti'),blood:g('blood'),gender:g('gender'),consent_global:$('#consent').checked,...readPrefs('r')});
+  me={id:r.id,token:r.token,name:g('name'),dept:g('dept'),alias:r.alias,pillars:r.pillars,mbti:g('mbti'),blood:g('blood'),zodiac:r.zodiac,...readPrefs('r'),...r.profile};localStorage.tbm=JSON.stringify(me);$('#prefs_me').innerHTML=prefsHTML('m',me);
+  $('#regout').innerHTML=`<div class="card"><h2>등록 완료 · 별명 <span style="color:var(--acc)">${r.alias}</span></h2><p class="mut">사주 8자 (지금만 표시, 저장 안 됨)</p><div class="big" style="font-size:26px">${r.pillars.map(x=>x||'시주 모름').join(' · ')}</div></div>`+prof(me,'내 성향')+sajuCard({...r.profile,birth_year:+g('year')});
+ }catch(e){$('#regmsg').textContent=e.message}}
+function sajuCard(p){if(!p.tens)return '';const N=['년','월','일','시'],cols=N.map((n,i)=>{const g=p.pillars[i],t=p.tens[n];if(!g)return `<div><div class="h">${n}주</div><div class="g" style="color:var(--mut)">--</div><div class="s">시각 모름</div></div>`;
+ const gm=p.gongmang.includes(g[1])&&i!==2?' <span style="color:var(--hwa)">공망</span>':'';return `<div><div class="h">${n}주 · ${t.stem||'일간'}</div><div class="g"><span style="color:${ELC[EL[[0,0,1,1,2,2,3,3,4,4]['갑을병정무기경신임계'.indexOf(g[0])]]]}">${g[0]}</span><span style="color:${ELC[EL[[4,2,0,0,2,1,1,2,3,3,2,4]['자축인묘진사오미신유술해'.indexOf(g[1])]]]}">${g[1]}</span></div><div class="s">${t.branch}${gm}<br>지장간 ${t.hidden.map(h=>h[0]).join('')} · ${t.unseong}</div></div>`}).join('');
+ const d=p.daeun;const age=new Date().getFullYear()-(p.birth_year||0);
+ return `<div class="card"><h2>사주 원국 <span class="mut" style="font-weight:500;font-size:13px">${p.lmt?'진태양시 '+p.lmt+' 기준':'시각 모름'}</span></h2><div class="pz">${cols}</div>
+ <div class="grid3"><div><b>일간</b>${p.day_master} ${p.dm_el} · ${p.dm_yin?'음':'양'}간 · <b style="display:inline;color:var(--fg)">${p.strength}</b> (부조 비율 ${p.support_ratio}) · 득령 ${p.deukryeong?'O':'X'} · 통근 ${p.rooted.join('·')||'없음'}<br>오행 힘: ${Object.entries(p.power).map(([k,v])=>`<span style="color:${ELC[k]};font-weight:700">${k}</span> ${v}`).join(' ')}</div>
+ <div><b>격국 · 용신</b><span style="font-size:17px;font-weight:800">${p.gyeok}</span> (${p.gyeok_god})<br>용신 <b style="display:inline;color:${ELC[p.yong]}">${p.yong}</b> · 희신 ${p.hui} · 기신 ${p.gi}${p.johu?' · 조후 '+p.johu:''}<br><span class="mut">${p.yong_why}</span></div>
+ <div><b>합충형파해 · 공망</b>${p.relations.length?p.relations.join('<br>'):'특이 관계 없음'}<br>공망 ${p.gongmang.join('')}${p.gongmang_hit.length?' ('+p.gongmang_hit.join('·')+'지)':''}</div></div>
+ ${d?`<label>대운 (${d.forward?'순행':'역행'} · ${d.start_age}세 시작)</label><div class="du">${d.list.map(x=>`<div class="${x.age<=age&&age<x.age+10?'cur':''}">${x.age}세<b>${x.ganzi}</b>${x.stem_god}/${x.branch_god}<br>${x.unseong}</div>`).join('')}</div>`:'<p class="mut">대운은 성별을 입력한 경우에만 계산합니다.</p>'}</div>`}
+async function showMe(){if(!me)return;$('#meout').innerHTML=prof(me,`${me.name} <span class="mut" style="font-weight:500">${me.alias} · ${me.dept}</span>`);$('#saju').innerHTML=sajuCard(me);
+ $('#today').innerHTML='<div class="card mut">오늘 운세 계산 중…</div>';$('#reading').innerHTML='<div class="card mut">일하는 스타일 해설 생성 중… (로컬 LLM, 10~30초)</div>';
+ api('/api/today?id='+me.id).then(t=>{const d=new Date(t.date+'T00:00');$('#today').innerHTML=`<div class="card"><div class="b"><div><div class="mut">${d.getMonth()+1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일 · ${t.day}일 · 오늘의 기운 ${tag(t.day_el,t.day_el+' '+ELW[t.day_el])}</div><div class="big" style="margin:6px 0">${t.theme_work.replace('·',' · ')}의 날</div><div class="stars" aria-label="컨디션 ${t.stars}/5">${'★'.repeat(t.stars)}<span style="opacity:.25">${'★'.repeat(5-t.stars)}</span></div></div></div>
+  <p style="font-size:16px;white-space:pre-line;margin:12px 0 0">${t.text}</p>
+  <div class="grid3"><div><b>🔬 오늘의 연구 운</b>${t.research}</div><div><b>🤝 오늘의 협업 운${t.branch_rel?' · '+t.branch_rel:''}</b>${t.collab}</div><div><b>🍚 오늘의 점심</b><span style="font-size:18px;font-weight:800">${t.menu}</span><br><span class="mut">${t.menu_why}</span></div></div>
+  <p class="mut" style="margin:12px 0 0">일진 ${t.day} <b>${t.day_god}</b> · 12운성 ${t.unseong}${t.branch_rel?' · 일지와 '+t.branch_rel:''} &nbsp;|&nbsp; 올해 세운 ${t.year.ganzi} <b>${t.year.god}</b>${t.year.rel?' ('+t.year.rel+')':''}${t.year.yong?' · 용신 해':t.year.gi?' · 기신 해':''} &nbsp;|&nbsp; 이달 월운 ${t.month.ganzi} <b>${t.month.god}</b>${t.month.rel?' ('+t.month.rel+')':''}${t.daeun?` &nbsp;|&nbsp; 현재 대운 ${t.daeun.ganzi} <b>${t.daeun.stem_god}</b>/${t.daeun.branch_god} (${t.daeun.age}세~)`:''}</p>
+  ${t.llm?'':'<p class="mut" style="margin:10px 0 0">LLM 미연결이라 규칙 문장입니다.</p>'}</div>`}).catch(e=>$('#today').innerHTML=`<div class="card err">${e.message}</div>`);
+ api(`/api/reading?id=${me.id}&token=${me.token}`).then(r=>{const [w,m]=r.reading.split('\n\n§\n\n');$('#reading').innerHTML=`<div class="card"><h2>일하는 스타일</h2><p style="white-space:pre-line;margin:0">${w}</p></div>`+(m?`<div class="card"><h2>명리 해설</h2><p style="white-space:pre-line;margin:0">${m}</p></div>`:'')}).catch(e=>$('#reading').innerHTML=`<div class="card err">${e.message}</div>`)}
+async function savePrefs(){const p=readPrefs('m');try{await api('/api/prefs',{id:me.id,token:me.token,...p});Object.assign(me,p);localStorage.tbm=JSON.stringify(me);$('#prefmsg').textContent='저장됨'}catch(e){$('#prefmsg').textContent=e.message}}
+async function del(){if(!me||!confirm('내 데이터를 삭제할까요?'))return;await api('/api/delete',{id:me.id,token:me.token});localStorage.removeItem('tbm');me=null;location.reload()}
+async function doMatch(){$('#matchmsg').textContent='';if(!me)return $('#matchmsg').textContent='먼저 등록하세요';
+ try{const q=new URLSearchParams({id:me.id,scope:$('#scope').value,age_band:$('#f_age').value,mbti:$('#f_mbti').value.toUpperCase(),dm_el:$('#f_el').value});
+  const r=await api('/api/match?'+q);$('#matchout').style.display='';$('#matchout').innerHTML=r.map((p,i)=>`<div class="m">${radar(p.elements,56,false,ELC[p.dm_el])}<div><b style="font-size:16px">${p.name||p.alias}</b> <span class="mut">${p.dept} · ${p.age_band}${p.mbti?' · '+p.mbti:''}</span><br><span class="mut">${p.why.join(' / ')||'무난한 조합'}</span></div><div class="sc">${p.score}${i===0?' 🏆':''}</div></div>`).join('');
+ }catch(e){$('#matchmsg').textContent=e.message;$('#matchout').style.display='none'}}
+async function makeBungae(){$('#bmsg').textContent='';try{await api('/api/bungae',{id:me.id,token:me.token,title:$('#b_title').value,place:$('#b_place').value,minutes:$('#b_min').value,hobby:$('#b_hobby').value,cap:$('#b_cap').value});$('#b_title').value='';loadBungae()}catch(e){$('#bmsg').textContent=e.message}}
+async function joinB(bid,leave){try{await api('/api/bungae/'+(leave?'leave':'join'),{id:me.id,token:me.token,bid});loadBungae()}catch(e){alert(e.message)}}
+let bTimer=null;
+async function loadBungae(){clearTimeout(bTimer);if(!me){$('#blist').innerHTML='<div class="card">먼저 등록하세요.</div>';return}
+ $('#b_hobby').innerHTML=(me.hobbies||[]).map(h=>`<option>${h}</option>`).join('')||'<option value="">내 프로필에서 취미를 먼저 고르세요</option>';
+ try{const r=await api('/api/bungae?id='+me.id);const fmt=t=>{const d=new Date(t),m=Math.round((d-Date.now())/60000);return `${t.slice(5,16).replace('T',' ')} (${m<0?'지남':m<60?m+'분 뒤':m<1440?Math.round(m/60)+'시간 뒤':Math.round(m/1440)+'일 뒤'})`};
+  $('#blist').innerHTML=r.length?r.map(b=>`<div class="card b"><div><h3>⚡ ${b.title}</h3><div>${tag(null,b.hobby).replace('<i style="background:null"></i>','')}${b.mine?`<span class="tag">내 번개 · ${b.reach}명에게 보임</span>`:b.joined?'<span class="tag">참여중</span>':`<span class="tag">호스트 궁합 ${b.score}</span>`}</div>
+   <div class="mut" style="margin-top:6px">📍 ${b.place} &nbsp; 🕒 ${fmt(b.at)} &nbsp; 👥 ${b.members.length}/${b.cap} &nbsp; 호스트 ${b.host_name}</div><div class="mut">${b.members.map(m=>m.name+'('+m.dept+')').join(', ')}${b.why?.length?' · '+b.why[0]:''}</div></div>
+   <div>${b.mine?`<button class="p d" onclick="joinB('${b.id}',1)">취소</button>`:b.joined?`<button class="p g" onclick="joinB('${b.id}',1)">빠지기</button>`:`<button class="p" onclick="joinB('${b.id}')">참여</button>`}</div></div>`).join('')
+   :'<div class="card mut">지금 나에게 맞는 번개가 없어요. 하나 쳐보세요.</div>';
+ }catch(e){$('#blist').innerHTML=`<div class="card err">${e.message}</div>`}
+ bTimer=setTimeout(loadBungae,30000)} // ponytail: 30초 폴링
+// ── 팀 맵 (canvas, 노드 = 미니 오각형) ──
+let G=null;
+async function loadMap(){const g=await api('/api/graph?dept='+encodeURIComponent($('#g_dept').value));
+ $('#g_dept').innerHTML='<option value="">회사 전체 (익명)</option>'+g.depts.map(d=>`<option ${d===$('#g_dept').value?'selected':''}>${d}</option>`).join('');
+ $('#balance_r').innerHTML=radar(g.balance,220);$('#balance').innerHTML=`<div class="big" style="font-size:22px;margin-top:8px">${$('#g_dept').value||'회사 전체'} <span class="mut" style="font-size:14px;font-weight:500">${g.nodes.length}명</span></div>`;
+ const cv=$('#cv'),W=cv.width=cv.clientWidth*2,Hh=cv.height=Math.max(900,Math.min(2000,g.nodes.length*70));cv.style.height=Hh/2+'px';
+ G=g;g.nodes.forEach((n,i)=>{const a=i*2.399;n.x=W/2+Math.cos(a)*W*0.4*Math.sqrt((i+1)/g.nodes.length);n.y=Hh/2+Math.sin(a)*Hh*0.4*Math.sqrt((i+1)/g.nodes.length);n.vx=n.vy=0});
+ const byId=Object.fromEntries(g.nodes.map(n=>[n.id,n]));
+ g.top=new Set();for(const n of g.nodes)g.edges.filter(e=>e.a===n.id||e.b===n.id).sort((a,b)=>b.score-a.score).slice(0,2).forEach(e=>g.top.add(e));
+ for(let it=0;it<400;it++){ // ponytail: 단순 스프링 레이아웃, 100명 넘으면 느려짐
+  for(const a of g.nodes)for(const b of g.nodes){if(a===b)continue;let dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy)||1,f=Math.min(60,90000/(d*d));a.vx+=dx/d*f;a.vy+=dy/d*f}
+  for(const e of g.edges){const a=byId[e.a],b=byId[e.b],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1,rest=180+(100-e.score)*6,f=(d-rest)*(g.top.has(e)?0.02:0.001);a.vx+=dx/d*f;a.vy+=dy/d*f;b.vx-=dx/d*f;b.vy-=dy/d*f}
+  for(const n of g.nodes){n.vx+=(W/2-n.x)*0.0006;n.vy+=(Hh/2-n.y)*0.0012;n.x+=n.vx*=0.75;n.y+=n.vy*=0.75;n.x=Math.max(90,Math.min(W-90,n.x));n.y=Math.max(70,Math.min(Hh-90,n.y))}}
+ $('#legend').innerHTML=EL.map(e=>`<span><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ELC[e]};vertical-align:-1px"></i> ${e} ${ELW[e]}</span>`).join('')+'<span>테두리 굵음 = 에너지 밖으로 · 노란 테두리 = 나</span>';
+ draw()}
+function pent(c,n,r){if(!n.elements)return;const max=Math.max(...EL.map(e=>n.elements[e]),1);c.beginPath();EL.forEach((e,i)=>{const a=-Math.PI/2+i*2*Math.PI/5,k=n.elements[e]/max;c[i?'lineTo':'moveTo'](n.x+Math.cos(a)*r*k,n.y+Math.sin(a)*r*k)});c.closePath()}
+function draw(sel){const cv=$('#cv'),c=cv.getContext('2d'),byId=Object.fromEntries(G.nodes.map(n=>[n.id,n])),fg=getComputedStyle(document.body).color;c.clearRect(0,0,cv.width,cv.height);
+ for(const e of G.edges){if(sel?(e.a!==sel.id&&e.b!==sel.id):!G.top.has(e))continue;const a=byId[e.a],b=byId[e.b],hi=e.score>=70,lo=e.score<50;
+  c.strokeStyle=hi?cssc('var(--acc)'):lo?cssc('var(--hwa)'):cssc('var(--geum)');c.globalAlpha=hi?.85:lo?.5:.45;c.lineWidth=hi?5:lo?2:3;c.setLineDash(lo?[10,10]:[]);c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke()}
+ c.globalAlpha=1;c.setLineDash([]);c.font='700 24px system-ui,sans-serif';c.textAlign='center';
+ for(const n of G.nodes){const r=n.strength==='신강'?46:38,col=cssc(ELC[n.dm_el]);c.beginPath();c.arc(n.x,n.y,r,0,7);c.fillStyle=cssc('var(--card)');c.fill();c.strokeStyle=n===sel?fg:n.id===me?.id?cssc('var(--to)'):cssc('var(--line)');c.lineWidth=n===sel||n.id===me?.id?5:2;c.stroke();
+  pent(c,n,r*0.8);c.fillStyle=col;c.globalAlpha=.35;c.fill();c.globalAlpha=1;c.lineWidth=2.5;c.strokeStyle=col;c.stroke();c.fillStyle=fg;c.fillText(n.name||n.alias,n.x,n.y+r+28)}}
+$('#cv').onclick=ev=>{if(!G)return;const r=$('#cv').getBoundingClientRect(),x=(ev.clientX-r.left)*2,y=(ev.clientY-r.top)*2,n=G.nodes.find(n=>Math.hypot(n.x-x,n.y-y)<44);draw(n);if(!n)return;
+ const rel=G.edges.filter(e=>e.a===n.id||e.b===n.id).map(e=>({o:G.nodes.find(m=>m.id===(e.a===n.id?e.b:e.a)),e})).sort((a,b)=>b.e.score-a.e.score);
+ $('#mapinfo').innerHTML=`<div class="hero" style="grid-template-columns:120px 1fr">${radar(n.elements,120,false,ELC[n.dm_el])}<div><b style="font-size:17px;color:var(--fg)">${n.name||n.alias}</b> ${tag(n.dm_el,n.dm_el+' '+ELW[n.dm_el])}${n.mbti?`<span class="tag">${n.mbti}</span>`:''}<br>`+rel.slice(0,5).map(r=>`<span style="color:var(--fg);font-weight:700">${r.e.score}</span> ${r.o.name||r.o.alias} <span class="mut">${r.e.why.slice(0,2).join(', ')}</span>`).join('<br>')+'</div></div>'};
+$('#g_dept').onchange=loadMap;
+api('/api/meta').then(()=>setTimeout(()=>{if(HASH)document.querySelector(`nav button[data-t=${HASH}]`)?.click()},400));
+</script></body></html>
