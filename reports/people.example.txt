@@ -1,0 +1,3 @@
+# 이름  생년월일    시각(모름이면 --)  MBTI  혈액형  성별(M/F/--)   ← 한 줄에 한 사람. python3 report.py reports/people.txt
+홍길동  1990-03-15  09:00  INTJ  A   M
+김영희  1995-07-22  --     ENFP  O   F

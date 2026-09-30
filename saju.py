@@ -238,7 +238,7 @@ def analyze(pillars, gender=None, birth_utc=None, prev_term=None, next_term=None
         cands = [rel_el(4), rel_el(0)]
         if pw(2) >= max(pw(3), pw(1)) and pw(2) > 0: yong, why = rel_el(0), "재성이 많아 신약이므로 재를 감당할 비겁"
         else: yong, why = rel_el(4), "관성·식상이 많아 신약이므로 일간을 생하는 인성"
-        hui = EL[(EL.index(yong) - 1) % 5]  # 신약: 용신을 생하는 오행
+        hui = rel_el(0) if yong == rel_el(4) else rel_el(4)  # 신약: 인성·비겁 중 용신이 아닌 쪽
     else:
         cands = [rel_el(4), rel_el(1)]
         yong, why = (rel_el(4), "중화라 흐름을 잇는 인성") if pw(4) <= pw(1) else (rel_el(1), "중화라 흐름을 잇는 식상")
