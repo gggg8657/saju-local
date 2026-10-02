@@ -378,12 +378,12 @@ def html_report(a, fits, cross, cross_title="명단 내 궁합", text=None):
     ez = easy(a)
     ez_html = ('<div class="card easy"><h2>쉬운 말로</h2>' + ''.join(f'<h3>{E(t)}</h3><ul>{"".join(f"<li>{E(x)}</li>" for x in ls)}</ul>' for t, ls in ez) + '</div>') if ez else ''
     chips = '<div class="chips">' + "".join(f'<a href="#{k}">{t}</a>' for k, t in CHIPS) + '</div>'
-    return f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{E(a['name'])} 사주 리포트</title><style>{CSS}</style></head><body>
+    return app.signed(f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{E(a['name'])} 사주 리포트</title><style>{CSS}</style></head><body>
 <div class="wrap"><nav class="toc"><input id="q" type="search" placeholder="찾기: 연애, 이직, 2027, 건강…" aria-label="리포트 안에서 찾기"><div id="hits"></div>{toc}</nav><main>
 <h1>{E(a['name'])}님의 사주 풀이<small>{' · '.join(x or '시주 모름' for x in a['pillars'])}{' · 진태양시 ' + a['lmt'] if a['lmt'] else ''} · {a['mbti'] or '-'} · {a['blood'] or '-'}형 · {a['zodiac']}자리{' · ' + ('남성' if a.get('gender') == 'M' else '여성') if a.get('gender') else ''} · {date.today().isoformat()} 작성</small></h1>
 {chips}{ez_html}{''.join(body)}
 <footer>절기는 VSOP87 기반 ±1분, 진태양시·서머타임·표준시 이력 보정. 신강약·용신·격국·신살은 규칙 계산이라 유파에 따라 다를 수 있고, 풀이 글은 로컬 LLM이 계산 근거를 바탕으로 쓴 것입니다. 과학적 근거 없음 · 재미로 보세요 · 건강은 의학적 진단이 아닙니다.</footer>
-</main></div><script>{JS}</script></body></html>"""
+</main></div><script>{JS}</script></body></html>""")
 
 
 def fits_of(a):

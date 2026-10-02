@@ -568,12 +568,32 @@ def delete(pid, token):
 
 
 # ── HTTP ─────────────────────────────────────────────────────────────────
+
+# ── 저작권 표기 (LICENSE·NOTICE 참고) ─────────────────────────────────────
+_SIG = __import__("base64").b64decode("wqkgMjAyNiDquYDrj5nso7wgwrcgZG9uZ2p1a2ltLmRldkBnbWFpbC5jb20=").decode()
+_SIG_A = __import__("base64").b64decode("RG9uZ0p1IEtpbSA8ZG9uZ2p1a2ltLmRldkBnbWFpbC5jb20+").decode()
+
+
+def signed(html):
+    """화면에 저작권 표기를 붙인다. ui.html 에서 지워져도 서버가 내보낼 때 다시 붙는다."""
+    name, mail = _SIG.split(" · ")
+    if 'name="author"' not in html:
+        meta = f'<meta name="author" content="{name[7:]} <{mail}>">'
+        html = html.replace("<head>", "<head>" + meta, 1) if "<head>" in html else meta + html
+    if "data-sig" not in html:
+        tag = (f'<!-- {_SIG} --><div data-sig title="{mail}" style="text-align:center;font-size:11px;color:#9aa0a6;'
+               f'opacity:.55;margin:28px 0 8px">{name}</div>')
+        html = html.replace("</body>", tag + "</body>", 1) if "</body>" in html else html + tag
+    return html
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 
     def _send(self, body, code=200, ctype="application/json", filename=None):
         b = body if isinstance(body, bytes) else json.dumps(body, ensure_ascii=False).encode()
         self.send_response(code); self.send_header("Content-Type", ctype + "; charset=utf-8")
+        self.send_header("X-Author", _SIG_A)
         if filename: self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + quote(filename))
         self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
 
@@ -590,9 +610,9 @@ class H(BaseHTTPRequestHandler):
             if u.path == "/api/fortune": return self._send(fortune_status(q.get("id"), q.get("token")))
             if u.path == "/report":
                 pid = q.get("id"); body = report_html(pid, q.get("token"))
-                return self._send(body, ctype="text/html", filename=f"사주리포트_{find(load(), pid)['name']}.html" if q.get("download") else None)
+                return self._send(signed(body.decode()).encode(), ctype="text/html", filename=f"사주리포트_{find(load(), pid)['name']}.html" if q.get("download") else None)
             if u.path == "/api/meta": return self._send({"axes": AXES, "labels": AXIS_LABEL, "hobbies": HOBBIES})
-            with open(os.path.join(ROOT, "ui.html"), "rb") as f: return self._send(f.read(), ctype="text/html")
+            with open(os.path.join(ROOT, "ui.html"), encoding="utf-8") as f: return self._send(signed(f.read()).encode(), ctype="text/html")
         except ValueError as e:
             self._send({"error": str(e)}, 400)
         except Exception as e:
@@ -616,5 +636,5 @@ class H(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print(f"팀 밸런스 맵 → http://localhost:{PORT}  (api={LLM_API} base={BASE} model={MODEL})")
+    print(f"팀 밸런스 맵 → http://localhost:{PORT}  (api={LLM_API} base={BASE} model={MODEL})  {_SIG}")
     ThreadingHTTPServer(("", PORT), H).serve_forever()
