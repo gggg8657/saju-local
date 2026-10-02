@@ -3,3 +3,4 @@ server.log
 __pycache__/
 reports/*
 !reports/people.example.txt
+app.log

@@ -250,6 +250,7 @@ GLOSSARY = [("일간", "나 자신을 나타내는 글자"), ("오행 힘", "다
 
 def easy(a):
     """reports/<이름>.easy.md 가 있으면 [(제목, [문장…])] 로 읽는다."""
+    if a.get("easy"): return a["easy"]
     p = os.path.join(OUT, a["name"] + ".easy.md")
     if not os.path.exists(p): return []
     secs = []
@@ -290,7 +291,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:8px 6px;b
 ol,ul{margin:0;padding-left:20px}li{margin:6px 0}.mut{color:#6B7280;font-size:13px}footer{color:#6B7280;font-size:12px;text-align:center;padding:20px}"""
 
 
-def html_report(a, fits, cross):
+def html_report(a, fits, cross, cross_title="명단 내 궁합"):
     E = html.escape
     N = "년월일시"
     cols = []
@@ -328,17 +329,34 @@ def html_report(a, fits, cross):
 <div class="two" style="margin-top:14px;grid-template-columns:1fr 1fr"><div><h2>잘 맞는 일간 (상대의 일간)</h2>{svg_stems(fits['stems'])}</div>
 <div><h2>잘 맞는 출생 연도</h2>{svg_years(fits['years'])}<p class="mut">파란색 70점 이상 · 빨간색 45점 미만. 막대에 마우스를 올리면 이유. 일지·띠와의 합충형파해, 천간합, 용신 해로 계산.</p></div></div>
 <table><tr><th></th><th>연도 (상위 10)</th><th>이유</th></tr>{top}</table><p class="mut" style="margin-top:8px">피할 연도 하위 5: {bad}</p></div>
-{lv_html}{'<div class="card"><h2>명단 내 궁합</h2><table><tr><th></th><th>상대</th><th>이유</th></tr>' + cr + '</table></div>' if cross else ''}
+{lv_html}{'<div class="card"><h2>' + cross_title + '</h2><table><tr><th></th><th>상대</th><th>이유</th></tr>' + cr + '</table></div>' if cross else ''}
 <footer>절기는 VSOP87 기반 ±1분, 진태양시·서머타임·표준시 이력 보정. 신강약·용신·격국은 규칙 점수라 유파에 따라 다를 수 있음. 과학적 근거 없음, 재미로.</footer></main></body></html>"""
+
+
+def fits_of(a):
+    years = year_fit(a)
+    return {"stems": stem_fit(a), "years": years, "top_years": sorted(years, key=lambda x: -x[3])[:10],
+            "bad_years": sorted(years, key=lambda x: x[3])[:5], "mbti": mbti_fit(a)}
+
+
+def from_record(rec, team):
+    """앱 저장 레코드(data/people.json)로 리포트 HTML. 원본 생년월일·성별은 저장하지 않으므로 연애운은 빠진다.
+       LLM 해설(reading)이 있으면 '쉬운 말로' 칸에, 같은 부서 사람(실명 공개 범위)과의 궁합을 표로 넣는다."""
+    raw = [[STEMS.index(g[0]), BRANCHES.index(g[1])] if g else None for g in rec["pillars"]]
+    ez = []
+    if rec.get("reading"):
+        for title, part in zip(("일하는 스타일", "명리 해설"), rec["reading"].split("\n\n§\n\n")):
+            ez.append((title, [x.strip() for x in part.split("\n") if x.strip()]))
+    a = {**rec, "raw": raw, "age": date.today().year - rec["birth_year"], "gender": None, "easy": ez}
+    cross = sorted([(o, *compat(a, o)) for o in team if o["id"] != rec["id"]], key=lambda x: -x[1])[:15]
+    return html_report(a, fits_of(a), cross, f"우리 팀 궁합 ({rec['dept']})")
 
 
 def main(path):
     people = [build(p) for p in parse(path)]
     os.makedirs(OUT, exist_ok=True)
     for a in people:
-        years = year_fit(a)
-        fits = {"stems": stem_fit(a), "years": years, "top_years": sorted(years, key=lambda x: -x[3])[:10],
-                "bad_years": sorted(years, key=lambda x: x[3])[:5], "mbti": mbti_fit(a)}
+        fits = fits_of(a)
         cross = sorted([(o, *compat(a, o)) for o in people if o is not a], key=lambda x: -x[1])
         base = os.path.join(OUT, a["name"])
         open(base + ".html", "w", encoding="utf-8").write(html_report(a, fits, cross))

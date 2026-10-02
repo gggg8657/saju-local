@@ -4,7 +4,7 @@
 import json, math, os, re, secrets, sys, threading, urllib.error, urllib.request
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(ROOT, "data")
@@ -459,6 +459,13 @@ def reading(pid, token):
     return {"reading": me["reading"]}
 
 
+def report_html(pid, token):
+    import report  # report 가 app 을 import 하므로 지연 import
+    people = load(); me = find(people, pid)
+    if not me or me["token"] != token: raise ValueError("권한 없음")
+    return report.from_record(me, [p for p in people if p["dept"] == me["dept"]]).encode()
+
+
 _status = {"t": 0, "v": None}
 
 
@@ -506,9 +513,10 @@ def delete(pid, token):
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 
-    def _send(self, body, code=200, ctype="application/json"):
+    def _send(self, body, code=200, ctype="application/json", filename=None):
         b = body if isinstance(body, bytes) else json.dumps(body, ensure_ascii=False).encode()
         self.send_response(code); self.send_header("Content-Type", ctype + "; charset=utf-8")
+        if filename: self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + quote(filename))
         self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
 
     def do_GET(self):
@@ -521,6 +529,9 @@ class H(BaseHTTPRequestHandler):
             if u.path == "/api/bungae": return self._send(list_bungae(q.get("id")))
             if u.path == "/api/me": return self._send(me_info(q.get("id"), q.get("token")))
             if u.path == "/api/status": return self._send(status())
+            if u.path == "/report":
+                pid = q.get("id"); body = report_html(pid, q.get("token"))
+                return self._send(body, ctype="text/html", filename=f"사주리포트_{find(load(), pid)['name']}.html" if q.get("download") else None)
             if u.path == "/api/meta": return self._send({"axes": AXES, "labels": AXIS_LABEL, "hobbies": HOBBIES})
             with open(os.path.join(ROOT, "ui.html"), "rb") as f: return self._send(f.read(), ctype="text/html")
         except ValueError as e:

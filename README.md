@@ -27,6 +27,9 @@ LLM_BASE_URL=http://gpu:11434 LLM_MODEL=qwen3:32b python3 app.py                
 - 성별은 대운 계산에만 쓰고 저장하지 않음. 대운 결과만 저장.
 
 ## 개인 리포트 (report.py)
+웹 UI: **나 · 오늘** 탭 맨 아래 "리포트 보기 / HTML로 저장" (`/report?id=&token=`). 저장된 4주·분석 결과로 만들고, LLM 해설을 "쉬운 말로" 칸에, 같은 부서 사람과의 궁합을 표로 넣는다. 생년월일 원본·성별을 저장하지 않으므로 웹 리포트에는 연애운·결혼운이 없다.
+
+CLI (명단 일괄):
 ```bash
 python3 report.py reports/people.txt     # 한 줄에 한 사람: 이름 YYYY-MM-DD HH:MM MBTI 혈액형 성별
 ```
