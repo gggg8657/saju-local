@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """python3 selftest.py — 만세력(VSOP87 절기·시간 보정)·명리 분석·궁합·번개 필터 자가검증. LLM 불필요."""
 from datetime import datetime, date
@@ -51,4 +52,9 @@ z = {x: 0 for x in app.AXES}
 host = {"traits": {**z, "에너지": -1}, "wants": {**z, "말": -1}}
 assert app.fits({"traits": {**z, "말": -1}, "wants": z}, host) and not app.fits({"traits": {**z, "말": 1}, "wants": z}, host)
 assert not app.fits({"traits": {**z, "말": -1}, "wants": {**z, "에너지": 1}}, host)
+# 저작권 표기: ui.html 에서 지워도 서버가 다시 붙인다 (LICENSE·NOTICE)
+import base64 as _b
+_h = app.signed(open(os.path.join(app.ROOT, 'ui.html'), encoding='utf-8').read().replace("data-sig", "").replace('name="author"', ""))
+assert "data-sig" in _h and 'name="author"' in _h and _b.b64decode("ZG9uZ2p1a2ltLmRldkBnbWFpbC5jb20=").decode() in _h, "저작권 표기 누락"
+
 print("selftest ok")
