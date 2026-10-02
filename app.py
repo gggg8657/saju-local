@@ -459,11 +459,67 @@ def reading(pid, token):
     return {"reading": me["reading"]}
 
 
-def report_html(pid, token):
-    import report  # report 가 app 을 import 하므로 지연 import
+FORTUNE = os.path.join(DATA, "fortune")  # <id>.json: 사주 풀이 글 캐시 {gender, model, ts, text}
+JOBS = {}  # id → {"done": [...], "total": n, "error": str|None}
+
+
+def auth(pid, token):
     people = load(); me = find(people, pid)
     if not me or me["token"] != token: raise ValueError("권한 없음")
-    return report.from_record(me, [p for p in people if p["dept"] == me["dept"]]).encode()
+    return people, me
+
+
+def fortune_cache(pid):
+    try:
+        with open(os.path.join(FORTUNE, pid + ".json"), encoding="utf-8") as f: return json.load(f)
+    except FileNotFoundError:
+        return None
+
+
+def fortune_status(pid, token):
+    import report
+    _, me = auth(pid, token)
+    c, j = fortune_cache(pid), JOBS.get(pid)
+    return {"ready": bool(c), "gender": c["gender"] if c else None, "model": c and c.get("model"), "ts": c and c.get("ts"),
+            "running": bool(j and j["running"]), "done": len(j["done"]) if j else 0, "total": j["total"] if j else 0,
+            "error": j and j.get("error"), "guess_gender": report.guess_gender(me)}
+
+
+def fortune_start(req):
+    """사주 풀이 글을 백그라운드로 쓴다 (섹션 15개, gemma4:31b 기준 2~3분). 같은 성별로 이미 있으면 regen 일 때만 다시."""
+    import fortune, report
+    pid, gender = req.get("id"), (req.get("gender") or "").upper() or None
+    if gender not in (None, "M", "F"): raise ValueError("성별")
+    _, me = auth(pid, req.get("token"))
+    c = fortune_cache(pid)
+    if JOBS.get(pid, {}).get("running") or (c and c["gender"] == gender and not req.get("regen")):
+        return fortune_status(pid, req.get("token"))
+    keys = [k for k, _, _ in fortune.SECTIONS]
+    job = JOBS[pid] = {"done": [], "total": len(keys), "running": True, "error": None}
+
+    def run():
+        try:
+            text = fortune.write(report.record_view(me, gender), llm, keys, on_done=job["done"].append)
+            errs = [v for k, v in text.items() if k.endswith(":error")]
+            text = {k: v for k, v in text.items() if not k.endswith(":error")}
+            if not text: raise RuntimeError(errs[0] if errs else "LLM 응답 없음")
+            os.makedirs(FORTUNE, exist_ok=True)
+            with open(os.path.join(FORTUNE, pid + ".json"), "w", encoding="utf-8") as f:
+                json.dump({"gender": gender, "model": MODEL, "ts": datetime.now().isoformat(timespec="minutes"), "text": text}, f, ensure_ascii=False)
+            if errs: job["error"] = f"{len(errs)}개 섹션 실패: {errs[0]}"
+        except Exception as e:
+            job["error"] = f"{type(e).__name__}: {e}"
+        job["running"] = False
+
+    threading.Thread(target=run, daemon=True).start()
+    return fortune_status(pid, req.get("token"))
+
+
+def report_html(pid, token):
+    import report  # report 가 app 을 import 하므로 지연 import
+    people, me = auth(pid, token)
+    c = fortune_cache(pid) or {}
+    return report.from_record(me, [p for p in people if p["dept"] == me["dept"]], c.get("gender"), c.get("text")).encode()
 
 
 _status = {"t": 0, "v": None}
@@ -503,6 +559,8 @@ def delete(pid, token):
         people = load(); me = find(people, pid)
         if not me or me["token"] != token: raise ValueError("권한 없음")
         save([p for p in people if p["id"] != pid])
+        try: os.remove(os.path.join(FORTUNE, pid + ".json"))
+        except FileNotFoundError: pass
         items = [b for b in load_b() if b["host"] != pid]
         for b in items: b["members"] = [m for m in b["members"] if m != pid]
         save_b(items)
@@ -529,6 +587,7 @@ class H(BaseHTTPRequestHandler):
             if u.path == "/api/bungae": return self._send(list_bungae(q.get("id")))
             if u.path == "/api/me": return self._send(me_info(q.get("id"), q.get("token")))
             if u.path == "/api/status": return self._send(status())
+            if u.path == "/api/fortune": return self._send(fortune_status(q.get("id"), q.get("token")))
             if u.path == "/report":
                 pid = q.get("id"); body = report_html(pid, q.get("token"))
                 return self._send(body, ctype="text/html", filename=f"사주리포트_{find(load(), pid)['name']}.html" if q.get("download") else None)
@@ -545,6 +604,7 @@ class H(BaseHTTPRequestHandler):
             if self.path == "/api/register": return self._send(register(req))
             if self.path == "/api/delete": return self._send(delete(req.get("id"), req.get("token")))
             if self.path == "/api/prefs": return self._send(update_prefs(req))
+            if self.path == "/api/fortune": return self._send(fortune_start(req))
             if self.path == "/api/bungae": return self._send(create_bungae(req))
             if self.path == "/api/bungae/join": return self._send(join_bungae(req))
             if self.path == "/api/bungae/leave": return self._send(join_bungae(req, leave=True))

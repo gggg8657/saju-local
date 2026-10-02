@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """python3 report.py reports/people.txt [--llm]
-   명단의 각 사람에 대해 reports/<이름>.html + .md 사주 리포트를 만든다. 명단 안 사람들끼리 상호 궁합도 넣는다.
+   명단의 각 사람에 대해 reports/<이름>.html + .md 사주 리포트를 만든다. --llm 이면 LLM 이 분야별·시기별 풀이 글을 쓴다(reports/<이름>.fortune.json 캐시). 명단 안 사람들끼리 상호 궁합도 넣는다.
    형식: 이름 YYYY-MM-DD HH:MM(모름 --) MBTI(--) 혈액형(--) 성별(M/F/--)"""
 import html, json, os, sys
 from datetime import date
@@ -198,7 +198,7 @@ def svg_years(years):
 
 def svg_love(years):
     w, h, bw = 1040, 130, 1040 / len(years); mx = max(x[3] for x in years) or 1
-    s = [f'<svg viewBox="0 0 {w} {h}" width="100%" style="max-width:{w}px">']
+    s = [f'<svg viewBox="0 -16 {w} {h + 16}" width="100%" style="max-width:{w}px">']
     for i, (y, gz, age, sc, why) in enumerate(years):
         hh = sc / mx * 90
         s.append(f'<rect x="{i*bw+4:.1f}" y="{100-hh:.1f}" width="{bw-8:.1f}" height="{hh:.1f}" rx="4" fill="#D6453D" opacity="{.25+sc/mx*.65:.2f}"><title>{y} {gz} {age}세 {sc}점 {" / ".join(why)}</title></rect>'
@@ -261,13 +261,16 @@ def easy(a):
     return secs
 
 
-def md_report(a, fits, cross):
+def md_report(a, fits, cross, text=None):
     L = [f"# {a['name']} 사주 리포트", "", f"- 원국: {' · '.join(x or '시주 모름' for x in a['pillars'])}" + (f" (진태양시 {a['lmt']})" if a["lmt"] else ""),
          f"- 일간 {a['day_master']}{a['dm_el']} · {a['strength']}({a['support_ratio']}) · {a['gyeok']} · 용신 {a['yong']} 희신 {a['hui']} 기신 {a['gi']}",
          f"- 오행 힘: " + ", ".join(f"{k} {v}" for k, v in a["power"].items()), f"- MBTI {a['mbti'] or '-'} · {a['blood'] or '-'}형 · {a['zodiac']}자리", ""]
     for title, lines in easy(a): L += [f"## 쉬운 말로 · {title}", ""] + [f"- {x}" for x in lines] + [""]
     L += ["## 용어", ""] + [f"- {k}: {v}" for k, v in GLOSSARY] + ["", "## 해설", ""]
     L += [f"- {x}" for x in narrative(a)]
+    import fortune
+    for k, title, _ in fortune.SECTIONS:
+        if (text or {}).get(k): L += ["", f"## {title}", "", text[k]]
     lv = love(a)
     if lv: L += ["", "## 연애운 · 결혼운", ""] + [f"- {x}" for x in love_text(a, lv)]
     L += ["", "## 잘 맞는 일간", ""] + [f"- {st} {sc}점 ({w})" for st, sc, w, e in fits["stems"][:5]]
@@ -278,59 +281,109 @@ def md_report(a, fits, cross):
     return "\n".join(L) + "\n"
 
 
-CSS = """*{box-sizing:border-box}body{margin:0;background:#EEF0F4;color:#14181F;font:15px/1.6 "Pretendard","Apple SD Gothic Neo",system-ui,"Malgun Gothic",sans-serif;font-variant-numeric:tabular-nums}
-main{max-width:1080px;margin:0 auto;padding:28px 16px 60px}h1{font-size:34px;font-weight:800;letter-spacing:-.03em;margin:0}h1 small{display:block;font-size:14px;font-weight:500;color:#6B7280;margin-top:6px;letter-spacing:0}
-h2{font-size:17px;font-weight:700;margin:0 0 12px}.card{background:#fff;border:1px solid #DDE1E8;border-radius:14px;padding:20px;margin:14px 0}
-.pz{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}.pz>div{background:#F5F6F9;border-radius:10px;padding:12px 4px}.pz .h{font-size:12px;color:#6B7280;font-weight:600}.pz .g{font-size:40px;font-weight:800;line-height:1.1}.pz .s{font-size:12px;color:#6B7280}
+
+
+CSS = """*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:16px}
+body{margin:0;background:#EEF0F4;color:#14181F;font:16px/1.75 "Pretendard","Apple SD Gothic Neo",system-ui,"Malgun Gothic",sans-serif;font-variant-numeric:tabular-nums;word-break:keep-all}
+.wrap{max-width:1240px;margin:0 auto;padding:28px 16px 60px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:24px}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}nav.toc{position:static!important;max-height:none!important}}
+nav.toc{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;background:#fff;border:1px solid #DDE1E8;border-radius:14px;padding:14px}
+nav.toc input{width:100%;padding:9px 11px;border:1px solid #C9CED6;border-radius:8px;font:inherit;font-size:14px;margin-bottom:10px}
+nav.toc .grp{font-size:11px;font-weight:700;color:#6B7280;letter-spacing:.04em;margin:12px 0 4px}nav.toc a{display:block;padding:4px 8px;border-radius:6px;color:#14181F;text-decoration:none;font-size:14px;line-height:1.45}
+nav.toc a:hover{background:#F5F6F9}nav.toc a.on{background:#E8EEF7;color:#2B4C7E;font-weight:700}nav.toc a.hide{display:none}#hits{font-size:12px;color:#6B7280;min-height:16px}
+h1{font-size:34px;font-weight:800;letter-spacing:-.03em;margin:0;line-height:1.25}h1 small{display:block;font-size:14px;font-weight:500;color:#6B7280;margin-top:6px;letter-spacing:0}
+h2{font-size:22px;font-weight:800;letter-spacing:-.02em;margin:0 0 14px}h3{font-size:17px;font-weight:700;margin:22px 0 6px;color:#2B4C7E}h3:first-child{margin-top:0}
+section.card,.card{background:#fff;border:1px solid #DDE1E8;border-radius:14px;padding:24px;margin:14px 0}section.hide{display:none}
+.card p{margin:0 0 12px}.card ul{margin:0 0 12px;padding-left:22px}.card li{margin:5px 0}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.chips a{padding:8px 14px;border-radius:99px;background:#fff;border:1px solid #DDE1E8;color:#14181F;text-decoration:none;font-weight:600;font-size:14px}.chips a:hover{border-color:#2B4C7E;color:#2B4C7E}
+.pz{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}.pz>div{background:#F5F6F9;border-radius:10px;padding:12px 4px}.pz .h{font-size:12px;color:#6B7280;font-weight:600}.pz .g{font-size:40px;font-weight:800;line-height:1.15}.pz .s{font-size:12px;color:#6B7280;line-height:1.5}
 .two{display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:center}@media(max-width:700px){.two{grid-template-columns:1fr}}
-.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.grid3>div{background:#F5F6F9;border-radius:10px;padding:14px}.grid3 b{display:block;font-size:12px;color:#6B7280;margin-bottom:6px}
-.tag{display:inline-block;padding:3px 9px;border-radius:99px;font-size:12px;background:#F5F6F9;border:1px solid #DDE1E8;margin:2px 4px 2px 0;font-weight:600}
-.du{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:6px}.du>div{border:1px solid #DDE1E8;border-radius:8px;padding:8px 4px;text-align:center;font-size:12px;color:#6B7280}.du b{display:block;font-size:19px;color:#14181F}.du .cur{border-color:#2B4C7E;background:#F5F6F9}
-table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:8px 6px;border-bottom:1px solid #DDE1E8;text-align:left;vertical-align:top}th{font-size:12px;color:#6B7280}.sc{font-size:22px;font-weight:800;letter-spacing:-.02em}
-.easy{border-color:#2B4C7E;border-width:2px}.easy h3{font-size:14px;color:#2B4C7E;margin:14px 0 4px}.easy li{font-size:15.5px}.gl{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:#6B7280}.gl b{color:#14181F}
-ol,ul{margin:0;padding-left:20px}li{margin:6px 0}.mut{color:#6B7280;font-size:13px}footer{color:#6B7280;font-size:12px;text-align:center;padding:20px}"""
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:12px 0}.grid3>div{background:#F5F6F9;border-radius:10px;padding:14px;font-size:15px;line-height:1.6}.grid3 b{display:block;font-size:12px;color:#6B7280;margin-bottom:6px}
+.tag{display:inline-block;padding:3px 10px;border-radius:99px;font-size:13px;background:#F5F6F9;border:1px solid #DDE1E8;margin:2px 4px 2px 0;font-weight:600}
+.du{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:6px;margin-bottom:16px}.du>div{border:1px solid #DDE1E8;border-radius:8px;padding:8px 4px;text-align:center;font-size:12px;color:#6B7280;line-height:1.5}.du b{display:block;font-size:19px;color:#14181F}.du .cur{border-color:#2B4C7E;background:#E8EEF7}
+table{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0}td,th{padding:8px 6px;border-bottom:1px solid #DDE1E8;text-align:left;vertical-align:top}th{font-size:12px;color:#6B7280}.sc{font-size:20px;font-weight:800}
+details{margin-top:14px;border-top:1px dashed #DDE1E8;padding-top:10px}summary{cursor:pointer;color:#6B7280;font-size:13px;font-weight:600}details ul{font-size:13.5px;color:#4B5563;margin-top:8px}
+.easy{border-color:#2B4C7E;border-width:2px}.gl{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:#6B7280}.gl b{color:#14181F}
+.mut{color:#6B7280;font-size:13.5px}.warn{background:#FFF7E6;border:1px solid #F3D9A4;border-radius:10px;padding:10px 14px;font-size:14px;margin-bottom:14px}
+mark{background:#FFE58A;border-radius:3px;padding:0 1px}footer{color:#6B7280;font-size:12px;text-align:center;padding:20px}
+@media print{nav.toc,.chips{display:none}.wrap{display:block}section.card,.card{break-inside:avoid-page;border:0;padding:8px 0}body{background:#fff}details{display:none}}"""
+
+GROUPS = [("기본", ["wonguk", "summary", "nature", "elements"]), ("분야별 운", ["career", "money", "study", "love", "marriage", "health", "people"]),
+          ("시기별 운", ["daeun", "year", "next_year", "monthly"]), ("더 보기", ["luck", "match"])]
+CHIPS = [("career", "💼 직업운"), ("money", "💰 재물운"), ("study", "📚 학업·시험운"), ("love", "💕 연애운"), ("marriage", "💍 결혼운"), ("health", "🩺 건강운"),
+         ("people", "🤝 인간관계"), ("year", f"📅 {date.today().year}년 운세"), ("monthly", "🗓 월별 운세"), ("daeun", "🧭 대운"), ("luck", "🍀 개운법")]
+JS = """const q=document.getElementById('q'),secs=[...document.querySelectorAll('main section')],links=[...document.querySelectorAll('nav.toc a')],hits=document.getElementById('hits');
+const orig=new Map(secs.map(s=>[s,s.innerHTML]));
+q.addEventListener('input',()=>{const w=q.value.trim();let n=0;secs.forEach(s=>{s.innerHTML=orig.get(s);const ok=!w||s.textContent.includes(w);s.classList.toggle('hide',!ok);
+ document.querySelector(`nav.toc a[href="#${s.id}"]`)?.classList.toggle('hide',!ok);if(ok&&w){n++;s.querySelectorAll('details').forEach(d=>d.open=d.textContent.includes(w));mark(s,w)}});
+ hits.textContent=w?(n?n+'개 항목에서 찾음':'찾는 말이 없어요'):''});
+function mark(root,w){const tw=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),ns=[];while(tw.nextNode())if(tw.currentNode.nodeValue.includes(w)&&!tw.currentNode.parentNode.closest('svg'))ns.push(tw.currentNode);
+ ns.forEach(t=>{const f=document.createDocumentFragment();t.nodeValue.split(w).forEach((p,i,a)=>{f.append(p);if(i<a.length-1){const m=document.createElement('mark');m.textContent=w;f.append(m)}});t.replaceWith(f)})}
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)links.forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+e.target.id))}),{rootMargin:'-10% 0px -80% 0px'});secs.forEach(s=>io.observe(s));"""
 
 
-def html_report(a, fits, cross, cross_title="명단 내 궁합"):
-    E = html.escape
-    N = "년월일시"
+def html_report(a, fits, cross, cross_title="명단 내 궁합", text=None):
+    """text: {섹션 키: 마크다운} (fortune.write 결과). 없으면 섹션마다 근거만 보여준다."""
+    import fortune
+    E = html.escape; N = "년월일시"; text = text or {}
+    F, lv = fortune.facts(a)
     cols = []
     for i in range(4):
         g = a["pillars"][i]
         if not g: cols.append(f'<div><div class="h">{N[i]}주</div><div class="g" style="color:#aaa">--</div><div class="s">시각 모름</div></div>'); continue
         t = a["tens"][N[i]]
         gm = ' <span style="color:#D6453D">공망</span>' if (g[1] in a["gongmang"] and i != 2) else ""
-        cols.append(f'<div><div class="h">{N[i]}주 · {t["stem"] or "일간"}</div><div class="g"><span style="color:{COLOR[EL[STEM_EL[STEMS.index(g[0])]]]}">{g[0]}</span>'
+        cols.append(f'<div><div class="h">{N[i]}주 · {t["stem"] or "일간(나)"}</div><div class="g"><span style="color:{COLOR[EL[STEM_EL[STEMS.index(g[0])]]]}">{g[0]}</span>'
                     f'<span style="color:{COLOR[EL[BR_EL[BRANCHES.index(g[1])]]]}">{g[1]}</span></div><div class="s">{t["branch"]}{gm}<br>지장간 {"".join(h for h,_ in t["hidden"])} · {t["unseong"]}</div></div>')
     d = a["daeun"]
-    du = "".join(f'<div class="{"cur" if x["age"] <= a["age"] < x["age"] + 10 else ""}">{x["age"]}세<b>{x["ganzi"]}</b>{x["stem_god"]}/{x["branch_god"]}<br>{x["unseong"]}</div>' for x in d["list"]) if d else '<p class="mut">성별을 적으면 대운을 계산합니다.</p>'
+    du = "".join(f'<div class="{"cur" if x["age"] <= a["age"] < x["age"] + 10 else ""}">{x["age"]}세<b>{x["ganzi"]}</b>{x["stem_god"]}/{x["branch_god"]}<br>{x["unseong"]}</div>' for x in d["list"]) if d else '<p class="mut">성별을 넣고 등록하면 대운을 계산합니다.</p>'
     top = "".join(f"<tr><td class='sc'>{sc}</td><td><b>{y}년</b> {gz} · {ani}띠</td><td class='mut'>{' / '.join(why) or '무난'}</td></tr>" for y, gz, ani, sc, why in fits["top_years"])
     bad = ", ".join(f"{y}년({ani}띠) {sc}" for y, gz, ani, sc, why in fits["bad_years"])
     mb = "".join(f'<span class="tag">{t} {sc}</span>' for t, sc in fits["mbti"][:6]) if fits["mbti"] else '<span class="mut">MBTI 없음</span>'
     cr = "".join(f"<tr><td class='sc'>{sc}</td><td><b>{E(o['name'])}</b> <span class='mut'>{' '.join(o['pillars'][:3])} · {o['mbti'] or '-'} · {o['blood'] or '-'}형</span></td><td class='mut'>{' / '.join(E(w) for w in why)}</td></tr>" for o, sc, why in cross)
-    good_el = f"{a['yong']} {EL_WORK[a['yong']]} · {a['hui']} {EL_WORK[a['hui']]}"
+    ss = fortune.sinsal(a)
+    luck = "".join(f"<tr><th>{k}</th><td><b>{E(v)}</b></td><td>{E(fortune.LUCK[a['hui']][k])}</td></tr>" for k, v in fortune.LUCK[a["yong"]].items())
+    extra = {
+        "summary": f'<div class="grid3"><div><b>나 (일간)</b><span style="font-size:20px;font-weight:800;color:{COLOR[a["dm_el"]]}">{a["day_master"]}{a["dm_el"]}</span> · {E(fortune.EL_PLAIN[a["dm_el"]])}</div>'
+                   f'<div><b>기운의 세기 · 그릇</b><span style="font-size:18px;font-weight:800">{a["strength"]}</span> · {a["gyeok"]}</div>'
+                   f'<div><b>필요한 기운 (용신)</b><span style="font-size:18px;font-weight:800;color:{COLOR[a["yong"]]}">{a["yong"]}</span> · 돕는 기운 {a["hui"]} · 부담 {a["gi"]}</div></div>'
+                   + ('<p>' + "".join(f'<span class="tag">{k} · {n}지</span>' for k, n in ss) + '</p>' if ss else ''),
+        "elements": f'<div class="two" style="margin-bottom:16px">{svg_radar(a["power"])}<div>' + "".join(f'<p><b style="color:{COLOR[e]}">{e} {a["power"][e]}</b> · {E(fortune.EL_PLAIN[e])}</p>' for e in EL) + '</div></div>',
+        "love": ('<h3>해별 연애 점수 (2025~2040)</h3>' + svg_love(lv["years"]) + '<p class="mut">막대에 마우스를 올리면 이유가 보여요.</p>') if lv else '',
+        "daeun": f'<div class="du">{du}</div>',
+        "luck": f'<table><tr><th></th><th>용신 {a["yong"]} (가장 필요)</th><th>희신 {a["hui"]} (돕는 기운)</th></tr>{luck}</table><p class="mut">줄이면 좋은 것 — 기신 {a["gi"]}: {fortune.LUCK[a["gi"]]["색"]}, {fortune.LUCK[a["gi"]]["방향"]}</p>',
+    }
+    no_gender = '<div class="warn">성별을 고르지 않아 배우자별(남성은 재성, 여성은 관성)을 쓰는 정밀 분석은 빠졌어요. 리포트를 만들 때 성별을 고르면 더 자세해져요.</div>'
+    body = []
+    body.append(f'<section class="card" id="wonguk"><h2>내 사주 원국표</h2><div class="pz">{"".join(cols)}</div>'
+                f'<div class="grid3"><div><b>일간 · 강약</b>{a["day_master"]} {a["dm_el"]} · {"음" if a["dm_yin"] else "양"}간 · <b style="display:inline;color:#14181F;font-size:15px">{a["strength"]}</b> (부조 비율 {a["support_ratio"]}) · 득령 {"O" if a["deukryeong"] else "X"} · 통근 {"·".join(a["rooted"]) or "없음"}</div>'
+                f'<div><b>격국 · 용신</b><span style="font-size:18px;font-weight:800">{a["gyeok"]}</span> ({a["gyeok_god"]})<br>용신 <b style="display:inline;color:{COLOR[a["yong"]]};font-size:15px">{a["yong"]}</b> · 희신 {a["hui"]} · 기신 {a["gi"]}{" · 조후 " + a["johu"] if a["johu"] else ""}<br><span class="mut">{a["yong_why"]}</span></div>'
+                f'<div><b>합충형파해 · 공망</b>{"<br>".join(a["relations"]) or "특이 관계 없음"}<br>공망 {"".join(a["gongmang"])}{" (" + "·".join(a["gongmang_hit"]) + "지)" if a["gongmang_hit"] else ""}</div></div>'
+                f'<h3>규칙으로 본 요점</h3><ul>{"".join(f"<li>{E(x)}</li>" for x in narrative(a))}</ul>'
+                f'<h3>용어 한 줄</h3><div class="gl">{"".join(f"<span><b>{k}</b> {v}</span>" for k, v in GLOSSARY)}</div></section>')
+    for k, title, _ in fortune.SECTIONS:
+        txt = text.get(k)
+        main_html = fortune.md_html(txt) if txt else ('<p class="mut">아직 풀이 글이 없어 계산된 근거만 보여드려요. 웹에서 "풀이 만들기"를 누르거나 <code>python3 report.py 명단 --llm</code> 으로 만들면 이 자리에 자세한 설명이 들어가요.</p><ul>'
+                                                       + "".join(f"<li>{E(x)}</li>" for x in F[k]) + '</ul>')
+        warn = no_gender if k in ("love", "marriage") and not lv else ""
+        body.append(f'<section class="card" id="{k}"><h2>{E(title)}</h2>{warn}{extra.get(k, "")}{main_html}'
+                    + (f'<details><summary>이 풀이의 근거 보기 (계산 결과)</summary><ul>{"".join(f"<li>{E(x)}</li>" for x in F[k])}</ul></details>' if txt else '') + '</section>')
+    body.append(f'<section class="card" id="match"><h2>궁합 — 나와 잘 맞는 사람</h2><div class="grid3"><div><b>필요한 기운 (용신·희신)</b>{a["yong"]} {EL_WORK[a["yong"]]} · {a["hui"]} {EL_WORK[a["hui"]]}<br><span class="mut">이 기운이 강한 사람이 나를 살려요.</span></div>'
+                f'<div><b>부담되는 기운 (기신)</b>{a["gi"]} {EL_WORK[a["gi"]]}<br><span class="mut">이쪽에 치우친 사람·일은 소모가 커요.</span></div><div><b>MBTI 상성</b>{mb}</div></div>'
+                f'<div class="two" style="grid-template-columns:1fr 1fr"><div><h3>잘 맞는 일간 (상대의 태어난 날 글자)</h3>{svg_stems(fits["stems"])}</div><div><h3>잘 맞는 출생 연도</h3>{svg_years(fits["years"])}<p class="mut">파란색 70점 이상 · 빨간색 45점 미만. 막대에 마우스를 올리면 이유가 보여요.</p></div></div>'
+                f'<table><tr><th></th><th>연도 (상위 10)</th><th>이유</th></tr>{top}</table><p class="mut">피할 연도 하위 5: {bad}</p>'
+                + (f'<h3>{E(cross_title)}</h3><table><tr><th></th><th>상대</th><th>이유</th></tr>{cr}</table>' if cross else '') + '</section>')
+    titles = {"wonguk": "내 사주 원국표", "match": "궁합 — 잘 맞는 사람", **{k: t for k, t, _ in fortune.SECTIONS}}
+    toc = "".join(f'<div class="grp">{g}</div>' + "".join(f'<a href="#{k}">{E(titles[k])}</a>' for k in ks) for g, ks in GROUPS)
     ez = easy(a)
     ez_html = ('<div class="card easy"><h2>쉬운 말로</h2>' + ''.join(f'<h3>{E(t)}</h3><ul>{"".join(f"<li>{E(x)}</li>" for x in ls)}</ul>' for t, ls in ez) + '</div>') if ez else ''
-    gl = '<div class="card"><h2>용어 한 줄</h2><div class="gl">' + ''.join(f'<span><b>{k}</b> {v}</span>' for k, v in GLOSSARY) + '</div></div>'
-    lv = love(a)
-    lv_html = ('<div class="card"><h2>연애운 · 결혼운 <span class="mut" style="font-weight:500;font-size:13px">' + ('여성' if lv['gender']=='F' else '남성') + ' 기준 · 재미로</span></h2><ul>' + ''.join(f'<li>{E(x)}</li>' for x in love_text(a, lv)) + '</ul>'
-               '<h2 style="margin-top:14px">해별 연애 점수 (2025~2040)</h2>' + svg_love(lv["years"]) + '</div>') if lv else ''
-
-    return f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{E(a['name'])} 사주 리포트</title><style>{CSS}</style></head><body><main>
-<h1>{E(a['name'])}<small>{' · '.join(x or '시주 모름' for x in a['pillars'])}{' · 진태양시 ' + a['lmt'] if a['lmt'] else ''} · {a['mbti'] or '-'} · {a['blood'] or '-'}형 · {a['zodiac']}자리 · 재미로 보는 자료</small></h1>
-{ez_html}{gl}<div class="card"><h2>사주 원국</h2><div class="pz">{''.join(cols)}</div>
-<div class="grid3" style="margin-top:12px"><div><b>일간 · 강약</b>{a['day_master']} {a['dm_el']} · {'음' if a['dm_yin'] else '양'}간 · <b style="display:inline;color:#14181F;font-size:15px">{a['strength']}</b> (부조 비율 {a['support_ratio']}) · 득령 {'O' if a['deukryeong'] else 'X'} · 통근 {'·'.join(a['rooted']) or '없음'}</div>
-<div><b>격국 · 용신</b><span style="font-size:18px;font-weight:800">{a['gyeok']}</span> ({a['gyeok_god']})<br>용신 <b style="display:inline;color:{COLOR[a['yong']]};font-size:15px">{a['yong']}</b> · 희신 {a['hui']} · 기신 {a['gi']}{' · 조후 ' + a['johu'] if a['johu'] else ''}<br><span class="mut">{a['yong_why']}</span></div>
-<div><b>합충형파해 · 공망</b>{'<br>'.join(a['relations']) or '특이 관계 없음'}<br>공망 {''.join(a['gongmang'])}{' (' + '·'.join(a['gongmang_hit']) + '지)' if a['gongmang_hit'] else ''}</div></div>
-<h2 style="margin-top:16px">대운{' (' + ('순행' if d['forward'] else '역행') + ' · ' + str(d['start_age']) + '세 시작)' if d else ''}</h2><div class="du">{du}</div></div>
-<div class="card"><div class="two">{svg_radar(a['power'])}<div><h2>해설</h2><ul>{''.join(f'<li>{E(x)}</li>' for x in narrative(a))}</ul></div></div></div>
-<div class="card"><h2>잘 맞는 성향</h2><div class="grid3"><div><b>필요한 기운 (용신·희신)</b>{good_el}<br><span class="mut">이 성향이 강한 사람·일이 나를 살립니다.</span></div>
-<div><b>피할 기운 (기신)</b>{a['gi']} {EL_WORK[a['gi']]}<br><span class="mut">이쪽에 치우친 사람·일은 소모가 큽니다.</span></div><div><b>MBTI 상성</b>{mb}</div></div>
-<div class="two" style="margin-top:14px;grid-template-columns:1fr 1fr"><div><h2>잘 맞는 일간 (상대의 일간)</h2>{svg_stems(fits['stems'])}</div>
-<div><h2>잘 맞는 출생 연도</h2>{svg_years(fits['years'])}<p class="mut">파란색 70점 이상 · 빨간색 45점 미만. 막대에 마우스를 올리면 이유. 일지·띠와의 합충형파해, 천간합, 용신 해로 계산.</p></div></div>
-<table><tr><th></th><th>연도 (상위 10)</th><th>이유</th></tr>{top}</table><p class="mut" style="margin-top:8px">피할 연도 하위 5: {bad}</p></div>
-{lv_html}{'<div class="card"><h2>' + cross_title + '</h2><table><tr><th></th><th>상대</th><th>이유</th></tr>' + cr + '</table></div>' if cross else ''}
-<footer>절기는 VSOP87 기반 ±1분, 진태양시·서머타임·표준시 이력 보정. 신강약·용신·격국은 규칙 점수라 유파에 따라 다를 수 있음. 과학적 근거 없음, 재미로.</footer></main></body></html>"""
+    chips = '<div class="chips">' + "".join(f'<a href="#{k}">{t}</a>' for k, t in CHIPS) + '</div>'
+    return f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{E(a['name'])} 사주 리포트</title><style>{CSS}</style></head><body>
+<div class="wrap"><nav class="toc"><input id="q" type="search" placeholder="찾기: 연애, 이직, 2027, 건강…" aria-label="리포트 안에서 찾기"><div id="hits"></div>{toc}</nav><main>
+<h1>{E(a['name'])}님의 사주 풀이<small>{' · '.join(x or '시주 모름' for x in a['pillars'])}{' · 진태양시 ' + a['lmt'] if a['lmt'] else ''} · {a['mbti'] or '-'} · {a['blood'] or '-'}형 · {a['zodiac']}자리{' · ' + ('남성' if a.get('gender') == 'M' else '여성') if a.get('gender') else ''} · {date.today().isoformat()} 작성</small></h1>
+{chips}{ez_html}{''.join(body)}
+<footer>절기는 VSOP87 기반 ±1분, 진태양시·서머타임·표준시 이력 보정. 신강약·용신·격국·신살은 규칙 계산이라 유파에 따라 다를 수 있고, 풀이 글은 로컬 LLM이 계산 근거를 바탕으로 쓴 것입니다. 과학적 근거 없음 · 재미로 보세요 · 건강은 의학적 진단이 아닙니다.</footer>
+</main></div><script>{JS}</script></body></html>"""
 
 
 def fits_of(a):
@@ -339,30 +392,53 @@ def fits_of(a):
             "bad_years": sorted(years, key=lambda x: x[3])[:5], "mbti": mbti_fit(a)}
 
 
-def from_record(rec, team):
-    """앱 저장 레코드(data/people.json)로 리포트 HTML. 원본 생년월일·성별은 저장하지 않으므로 연애운은 빠진다.
-       LLM 해설(reading)이 있으면 '쉬운 말로' 칸에, 같은 부서 사람(실명 공개 범위)과의 궁합을 표로 넣는다."""
+def guess_gender(rec):
+    """대운 방향(양남음녀 순행)으로 성별 추정 — 등록 때 성별을 넣은 경우만"""
+    d = rec.get("daeun")
+    if not d: return None
+    yang = STEMS.index(rec["pillars"][0][0]) % 2 == 0
+    return "M" if yang == d["forward"] else "F"
+
+
+def record_view(rec, gender=None):
+    """앱 저장 레코드(data/people.json) → 리포트용 dict. 원본 생년월일·성별은 저장하지 않으므로 성별은 인자로 받는다."""
     raw = [[STEMS.index(g[0]), BRANCHES.index(g[1])] if g else None for g in rec["pillars"]]
     ez = []
     if rec.get("reading"):
         for title, part in zip(("일하는 스타일", "명리 해설"), rec["reading"].split("\n\n§\n\n")):
             ez.append((title, [x.strip() for x in part.split("\n") if x.strip()]))
-    a = {**rec, "raw": raw, "age": date.today().year - rec["birth_year"], "gender": None, "easy": ez}
+    return {**rec, "raw": raw, "age": date.today().year - rec["birth_year"], "gender": gender, "easy": ez}
+
+
+def from_record(rec, team, gender=None, text=None):
+    """웹 리포트: 풀이 글(text)이 있으면 넣고, 같은 부서 사람(실명 공개 범위)과의 궁합을 표로 넣는다."""
+    a = record_view(rec, gender)
     cross = sorted([(o, *compat(a, o)) for o in team if o["id"] != rec["id"]], key=lambda x: -x[1])[:15]
-    return html_report(a, fits_of(a), cross, f"우리 팀 궁합 ({rec['dept']})")
+    return html_report(a, fits_of(a), cross, f"우리 팀 궁합 ({rec['dept']})", text)
 
 
-def main(path):
+def main(path, use_llm=False):
+    import fortune
     people = [build(p) for p in parse(path)]
     os.makedirs(OUT, exist_ok=True)
     for a in people:
         fits = fits_of(a)
         cross = sorted([(o, *compat(a, o)) for o in people if o is not a], key=lambda x: -x[1])
         base = os.path.join(OUT, a["name"])
-        open(base + ".html", "w", encoding="utf-8").write(html_report(a, fits, cross))
-        open(base + ".md", "w", encoding="utf-8").write(md_report(a, fits, cross))
+        text = None
+        if use_llm:
+            cache = base + ".fortune.json"
+            text = json.load(open(cache, encoding="utf-8")) if os.path.exists(cache) else {}
+            todo = [k for k, _, _ in fortune.SECTIONS if k not in text]
+            if todo:
+                print(f"  {a['name']}: 풀이 {len(todo)}개 작성 중 (LLM {app.MODEL})…", flush=True)
+                text.update({k: v for k, v in fortune.write(a, app.llm, todo, on_done=lambda k: print(f"    ✓ {k}", flush=True)).items() if ":error" not in k})
+                json.dump(text, open(cache, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        open(base + ".html", "w", encoding="utf-8").write(html_report(a, fits, cross, text=text))
+        open(base + ".md", "w", encoding="utf-8").write(md_report(a, fits, cross, text))
         print(f"{a['name']:8} {' '.join(x or '----' for x in a['pillars'])}  {a['strength']} {a['gyeok']} 용신 {a['yong']}  → reports/{a['name']}.html")
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else os.path.join(OUT, "people.txt"))
+    args = [x for x in sys.argv[1:] if not x.startswith("--")]
+    main(args[0] if args else os.path.join(OUT, "people.txt"), "--llm" in sys.argv)
