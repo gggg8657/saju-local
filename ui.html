@@ -97,15 +97,15 @@ const axes=(n,cur={})=>META.axes.map(a=>`<div class="ax"><span class="mut">${a}<
 const readPrefs=pre=>({hobbies:[...document.querySelectorAll(`input[name=${pre}_h]:checked`)].map(x=>x.value),
  traits:Object.fromEntries(META.axes.map(a=>[a,+(document.querySelector(`input[name=${pre}_t_${a}]:checked`)?.value||0)])),
  wants:Object.fromEntries(META.axes.map(a=>[a,+(document.querySelector(`input[name=${pre}_w_${a}]:checked`)?.value||0)]))});
-api('/api/meta').then(async m=>{META=m;$('#prefs_reg').innerHTML=prefsHTML('r');
- if(me){try{Object.assign(me,await api(`/api/me?id=${me.id}&token=${me.token}`));localStorage.tbm=JSON.stringify(me);$('#prefs_me').innerHTML=prefsHTML('m',me)}catch(e){localStorage.removeItem('tbm');me=null}}});
-api('/api/status').then(s=>{const p=$('#llm');p.classList.toggle('on',s.llm);p.innerHTML=`<i></i>${s.llm?`LLM 연결됨 · ${s.model}${s.model_found===false?' (모델 없음)':''}`:'LLM 미연결 · 규칙 문장으로 대체'}`});
+api('api/meta').then(async m=>{META=m;$('#prefs_reg').innerHTML=prefsHTML('r');
+ if(me){try{Object.assign(me,await api(`api/me?id=${me.id}&token=${me.token}`));localStorage.tbm=JSON.stringify(me);$('#prefs_me').innerHTML=prefsHTML('m',me)}catch(e){localStorage.removeItem('tbm');me=null}}});
+api('api/status').then(s=>{const p=$('#llm');p.classList.toggle('on',s.llm);p.innerHTML=`<i></i>${s.llm?`LLM 연결됨 · ${s.model}${s.model_found===false?' (모델 없음)':''}`:'LLM 미연결 · 규칙 문장으로 대체'}`});
 const prof=(p,title)=>`<div class="card"><h2>${title}</h2><div class="hero">${radar(p.elements,220,true,ELC[p.dm_el])}<div>
  <div style="margin-bottom:10px">${tag(p.dm_el,`핵심 ${p.dm_el} · ${ELW[p.dm_el]}`)}<span class="tag">${p.strength==='신강'?'에너지 밖으로':'에너지 안으로'}</span>${p.mbti?`<span class="tag">${p.mbti}</span>`:''}${p.zodiac?`<span class="tag">${p.zodiac}자리</span>`:''}${p.blood?`<span class="tag">${p.blood}형</span>`:''}</div>
  <label>팀에서의 역할 분포</label><div>${Object.entries(p.ten_gods).map(([k,v])=>`<span class="tag">${TENW[k]} <b>${v}</b></span>`).join('')}</div>
  ${p.lacking?.length?`<p class="mut" style="margin:10px 0 0">비어 있는 성향: ${p.lacking.map(e=>`${e} ${ELW[e]}`).join(', ')} — 이걸 가진 사람과 붙으면 균형이 맞습니다.</p>`:''}</div></div></div>`;
 async function register(){$('#regmsg').textContent='';const g=id=>$('#'+id).value;
- try{const r=await api('/api/register',{name:g('name'),dept:g('dept'),year:g('year'),month:g('month'),day:g('day'),hour:g('hour'),minute:g('minute'),mbti:g('mbti'),blood:g('blood'),gender:g('gender'),consent_global:$('#consent').checked,...readPrefs('r')});
+ try{const r=await api('api/register',{name:g('name'),dept:g('dept'),year:g('year'),month:g('month'),day:g('day'),hour:g('hour'),minute:g('minute'),mbti:g('mbti'),blood:g('blood'),gender:g('gender'),consent_global:$('#consent').checked,...readPrefs('r')});
   me={id:r.id,token:r.token,name:g('name'),dept:g('dept'),alias:r.alias,pillars:r.pillars,mbti:g('mbti'),blood:g('blood'),zodiac:r.zodiac,...readPrefs('r'),...r.profile};localStorage.tbm=JSON.stringify(me);$('#prefs_me').innerHTML=prefsHTML('m',me);
   $('#regout').innerHTML=`<div class="card"><h2>등록 완료 · 별명 <span style="color:var(--acc)">${r.alias}</span></h2><p class="mut">사주 8자 (지금만 표시, 저장 안 됨)</p><div class="big" style="font-size:26px">${r.pillars.map(x=>x||'시주 모름').join(' · ')}</div></div>`+prof(me,'내 성향')+sajuCard({...r.profile,birth_year:+g('year')});
  }catch(e){$('#regmsg').textContent=e.message}}
@@ -119,35 +119,35 @@ function sajuCard(p){if(!p.tens)return '';const N=['년','월','일','시'],cols
  ${d?`<label>대운 (${d.forward?'순행':'역행'} · ${d.start_age}세 시작)</label><div class="du">${d.list.map(x=>`<div class="${x.age<=age&&age<x.age+10?'cur':''}">${x.age}세<b>${x.ganzi}</b>${x.stem_god}/${x.branch_god}<br>${x.unseong}</div>`).join('')}</div>`:'<p class="mut">대운은 성별을 입력한 경우에만 계산합니다.</p>'}</div>`}
 async function showMe(){if(!me)return;$('#meout').innerHTML=prof(me,`${me.name} <span class="mut" style="font-weight:500">${me.alias} · ${me.dept}</span>`);$('#saju').innerHTML=sajuCard(me);
  $('#today').innerHTML='<div class="card mut">오늘 운세 계산 중…</div>';$('#reading').innerHTML='<div class="card mut">일하는 스타일 해설 생성 중… (로컬 LLM, 10~30초)</div>';
- api('/api/today?id='+me.id).then(t=>{const d=new Date(t.date+'T00:00');$('#today').innerHTML=`<div class="card"><div class="b"><div><div class="mut">${d.getMonth()+1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일 · ${t.day}일 · 오늘의 기운 ${tag(t.day_el,t.day_el+' '+ELW[t.day_el])}</div><div class="big" style="margin:6px 0">${t.theme_work.replace('·',' · ')}의 날</div><div class="stars" aria-label="컨디션 ${t.stars}/5">${'★'.repeat(t.stars)}<span style="opacity:.25">${'★'.repeat(5-t.stars)}</span></div></div></div>
+ api('api/today?id='+me.id).then(t=>{const d=new Date(t.date+'T00:00');$('#today').innerHTML=`<div class="card"><div class="b"><div><div class="mut">${d.getMonth()+1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일 · ${t.day}일 · 오늘의 기운 ${tag(t.day_el,t.day_el+' '+ELW[t.day_el])}</div><div class="big" style="margin:6px 0">${t.theme_work.replace('·',' · ')}의 날</div><div class="stars" aria-label="컨디션 ${t.stars}/5">${'★'.repeat(t.stars)}<span style="opacity:.25">${'★'.repeat(5-t.stars)}</span></div></div></div>
   <p style="font-size:16px;white-space:pre-line;margin:12px 0 0">${t.text}</p>
   <div class="grid3"><div><b>🔬 오늘의 연구 운</b>${t.research}</div><div><b>🤝 오늘의 협업 운${t.branch_rel?' · '+t.branch_rel:''}</b>${t.collab}</div><div><b>🍚 오늘의 점심</b><span style="font-size:18px;font-weight:800">${t.menu}</span><br><span class="mut">${t.menu_why}</span></div></div>
   <p class="mut" style="margin:12px 0 0">일진 ${t.day} <b>${t.day_god}</b> · 12운성 ${t.unseong}${t.branch_rel?' · 일지와 '+t.branch_rel:''} &nbsp;|&nbsp; 올해 세운 ${t.year.ganzi} <b>${t.year.god}</b>${t.year.rel?' ('+t.year.rel+')':''}${t.year.yong?' · 용신 해':t.year.gi?' · 기신 해':''} &nbsp;|&nbsp; 이달 월운 ${t.month.ganzi} <b>${t.month.god}</b>${t.month.rel?' ('+t.month.rel+')':''}${t.daeun?` &nbsp;|&nbsp; 현재 대운 ${t.daeun.ganzi} <b>${t.daeun.stem_god}</b>/${t.daeun.branch_god} (${t.daeun.age}세~)`:''}</p>
   ${t.llm?'':'<p class="mut" style="margin:10px 0 0">LLM 미연결이라 규칙 문장입니다.</p>'}</div>`}).catch(e=>$('#today').innerHTML=`<div class="card err">${e.message}</div>`);
- api(`/api/reading?id=${me.id}&token=${me.token}`).then(r=>{const [w,m]=r.reading.split('\n\n§\n\n');$('#reading').innerHTML=`<div class="card"><h2>일하는 스타일</h2><p style="white-space:pre-line;margin:0">${w}</p></div>`+(m?`<div class="card"><h2>명리 해설</h2><p style="white-space:pre-line;margin:0">${m}</p></div>`:'')+reportCard()}).catch(e=>$('#reading').innerHTML=`<div class="card err">${e.message}</div>`+reportCard())}
+ api(`api/reading?id=${me.id}&token=${me.token}`).then(r=>{const [w,m]=r.reading.split('\n\n§\n\n');$('#reading').innerHTML=`<div class="card"><h2>일하는 스타일</h2><p style="white-space:pre-line;margin:0">${w}</p></div>`+(m?`<div class="card"><h2>명리 해설</h2><p style="white-space:pre-line;margin:0">${m}</p></div>`:'')+reportCard()}).catch(e=>$('#reading').innerHTML=`<div class="card err">${e.message}</div>`+reportCard())}
 function reportCard(){setTimeout(fortunePoll,0);return `<div class="card" id="rcard"><h2>📖 사주 풀이 리포트</h2><p class="mut" style="margin:0 0 8px">성격·오행부터 <b>직업·재물·학업·연애·결혼·건강·인간관계</b>, 대운(10년 운)·올해·내년·월별 운세, 개운법까지 15개 주제를 로컬 LLM이 쉬운 말로 자세히 풀어 써요. 목차와 검색으로 필요한 해석만 골라 볼 수 있어요. 성별은 연애·결혼운 계산에만 쓰고 계정에는 저장하지 않아요.</p><div id="rbody" class="mut">불러오는 중…</div></div>`}
 let fpTimer=null;
-async function fortunePoll(){const el=$('#rbody');if(!el||!me)return;let s;try{s=await api(`/api/fortune?id=${me.id}&token=${me.token}`)}catch(e){el.textContent=e.message;return}
- const q=`/report?id=${me.id}&token=${me.token}`,g=s.gender||s.guess_gender||'';
+async function fortunePoll(){const el=$('#rbody');if(!el||!me)return;let s;try{s=await api(`api/fortune?id=${me.id}&token=${me.token}`)}catch(e){el.textContent=e.message;return}
+ const q=`report?id=${me.id}&token=${me.token}`,g=s.gender||s.guess_gender||'';
  const sel=`<label>성별 <select id="fgender"><option value="">선택 안 함</option><option value="M"${g==='M'?' selected':''}>남성</option><option value="F"${g==='F'?' selected':''}>여성</option></select></label>`;
  if(s.running){el.innerHTML=`<div style="margin:8px 0">풀이 쓰는 중… <b>${s.done}/${s.total}</b> 주제 완료 (전체 2~3분)</div><div style="height:8px;background:var(--soft);border-radius:99px;overflow:hidden"><div style="height:100%;width:${Math.round(s.done/s.total*100)}%;background:var(--acc);transition:width .4s"></div></div>`;clearTimeout(fpTimer);fpTimer=setTimeout(fortunePoll,2500);return}
  const err=s.error?`<p class="err">${s.error}</p>`:'';
  el.innerHTML=s.ready?`${err}<p style="margin:6px 0">✅ ${s.ts} 작성됨 (${s.model}${s.gender?', '+(s.gender==='M'?'남성':'여성'):''})</p><button class="p" onclick="window.open('${q}','_blank')">리포트 보기</button> <button class="p g" onclick="location.href='${q}&download=1'">HTML로 저장</button>
   <div style="margin-top:10px">${sel} <button class="p g" style="margin-top:0" onclick="fortuneMake(1)">다시 쓰기</button></div>`
   :`${err}${sel} <button class="p" onclick="fortuneMake(0)">풀이 만들기</button> <button class="p g" onclick="window.open('${q}','_blank')">계산 결과만 보기</button>`}
-async function fortuneMake(regen){try{await api('/api/fortune',{id:me.id,token:me.token,gender:$('#fgender').value,regen:!!regen})}catch(e){alert(e.message)}fortunePoll()}
-async function savePrefs(){const p=readPrefs('m');try{await api('/api/prefs',{id:me.id,token:me.token,...p});Object.assign(me,p);localStorage.tbm=JSON.stringify(me);$('#prefmsg').textContent='저장됨'}catch(e){$('#prefmsg').textContent=e.message}}
-async function del(){if(!me||!confirm('내 데이터를 삭제할까요?'))return;await api('/api/delete',{id:me.id,token:me.token});localStorage.removeItem('tbm');me=null;location.reload()}
+async function fortuneMake(regen){try{await api('api/fortune',{id:me.id,token:me.token,gender:$('#fgender').value,regen:!!regen})}catch(e){alert(e.message)}fortunePoll()}
+async function savePrefs(){const p=readPrefs('m');try{await api('api/prefs',{id:me.id,token:me.token,...p});Object.assign(me,p);localStorage.tbm=JSON.stringify(me);$('#prefmsg').textContent='저장됨'}catch(e){$('#prefmsg').textContent=e.message}}
+async function del(){if(!me||!confirm('내 데이터를 삭제할까요?'))return;await api('api/delete',{id:me.id,token:me.token});localStorage.removeItem('tbm');me=null;location.reload()}
 async function doMatch(){$('#matchmsg').textContent='';if(!me)return $('#matchmsg').textContent='먼저 등록하세요';
  try{const q=new URLSearchParams({id:me.id,scope:$('#scope').value,age_band:$('#f_age').value,mbti:$('#f_mbti').value.toUpperCase(),dm_el:$('#f_el').value});
-  const r=await api('/api/match?'+q);$('#matchout').style.display='';$('#matchout').innerHTML=r.map((p,i)=>`<div class="m">${radar(p.elements,56,false,ELC[p.dm_el])}<div><b style="font-size:16px">${p.name||p.alias}</b> <span class="mut">${p.dept} · ${p.age_band}${p.mbti?' · '+p.mbti:''}</span><br><span class="mut">${p.why.join(' / ')||'무난한 조합'}</span></div><div class="sc">${p.score}${i===0?' 🏆':''}</div></div>`).join('');
+  const r=await api('api/match?'+q);$('#matchout').style.display='';$('#matchout').innerHTML=r.map((p,i)=>`<div class="m">${radar(p.elements,56,false,ELC[p.dm_el])}<div><b style="font-size:16px">${p.name||p.alias}</b> <span class="mut">${p.dept} · ${p.age_band}${p.mbti?' · '+p.mbti:''}</span><br><span class="mut">${p.why.join(' / ')||'무난한 조합'}</span></div><div class="sc">${p.score}${i===0?' 🏆':''}</div></div>`).join('');
  }catch(e){$('#matchmsg').textContent=e.message;$('#matchout').style.display='none'}}
-async function makeBungae(){$('#bmsg').textContent='';try{await api('/api/bungae',{id:me.id,token:me.token,title:$('#b_title').value,place:$('#b_place').value,minutes:$('#b_min').value,hobby:$('#b_hobby').value,cap:$('#b_cap').value});$('#b_title').value='';loadBungae()}catch(e){$('#bmsg').textContent=e.message}}
-async function joinB(bid,leave){try{await api('/api/bungae/'+(leave?'leave':'join'),{id:me.id,token:me.token,bid});loadBungae()}catch(e){alert(e.message)}}
+async function makeBungae(){$('#bmsg').textContent='';try{await api('api/bungae',{id:me.id,token:me.token,title:$('#b_title').value,place:$('#b_place').value,minutes:$('#b_min').value,hobby:$('#b_hobby').value,cap:$('#b_cap').value});$('#b_title').value='';loadBungae()}catch(e){$('#bmsg').textContent=e.message}}
+async function joinB(bid,leave){try{await api('api/bungae/'+(leave?'leave':'join'),{id:me.id,token:me.token,bid});loadBungae()}catch(e){alert(e.message)}}
 let bTimer=null;
 async function loadBungae(){clearTimeout(bTimer);if(!me){$('#blist').innerHTML='<div class="card">먼저 등록하세요.</div>';return}
  $('#b_hobby').innerHTML=(me.hobbies||[]).map(h=>`<option>${h}</option>`).join('')||'<option value="">내 프로필에서 취미를 먼저 고르세요</option>';
- try{const r=await api('/api/bungae?id='+me.id);const fmt=t=>{const d=new Date(t),m=Math.round((d-Date.now())/60000);return `${t.slice(5,16).replace('T',' ')} (${m<0?'지남':m<60?m+'분 뒤':m<1440?Math.round(m/60)+'시간 뒤':Math.round(m/1440)+'일 뒤'})`};
+ try{const r=await api('api/bungae?id='+me.id);const fmt=t=>{const d=new Date(t),m=Math.round((d-Date.now())/60000);return `${t.slice(5,16).replace('T',' ')} (${m<0?'지남':m<60?m+'분 뒤':m<1440?Math.round(m/60)+'시간 뒤':Math.round(m/1440)+'일 뒤'})`};
   $('#blist').innerHTML=r.length?r.map(b=>`<div class="card b"><div><h3>⚡ ${b.title}</h3><div>${tag(null,b.hobby).replace('<i style="background:null"></i>','')}${b.mine?`<span class="tag">내 번개 · ${b.reach}명에게 보임</span>`:b.joined?'<span class="tag">참여중</span>':`<span class="tag">호스트 궁합 ${b.score}</span>`}</div>
    <div class="mut" style="margin-top:6px">📍 ${b.place} &nbsp; 🕒 ${fmt(b.at)} &nbsp; 👥 ${b.members.length}/${b.cap} &nbsp; 호스트 ${b.host_name}</div><div class="mut">${b.members.map(m=>m.name+'('+m.dept+')').join(', ')}${b.why?.length?' · '+b.why[0]:''}</div></div>
    <div>${b.mine?`<button class="p d" onclick="joinB('${b.id}',1)">취소</button>`:b.joined?`<button class="p g" onclick="joinB('${b.id}',1)">빠지기</button>`:`<button class="p" onclick="joinB('${b.id}')">참여</button>`}</div></div>`).join('')
@@ -156,7 +156,7 @@ async function loadBungae(){clearTimeout(bTimer);if(!me){$('#blist').innerHTML='
  bTimer=setTimeout(loadBungae,30000)} // ponytail: 30초 폴링
 // ── 팀 맵 (canvas, 노드 = 미니 오각형) ──
 let G=null;
-async function loadMap(){const g=await api('/api/graph?dept='+encodeURIComponent($('#g_dept').value));
+async function loadMap(){const g=await api('api/graph?dept='+encodeURIComponent($('#g_dept').value));
  $('#g_dept').innerHTML='<option value="">회사 전체 (익명)</option>'+g.depts.map(d=>`<option ${d===$('#g_dept').value?'selected':''}>${d}</option>`).join('');
  $('#balance_r').innerHTML=radar(g.balance,220);$('#balance').innerHTML=`<div class="big" style="font-size:22px;margin-top:8px">${$('#g_dept').value||'회사 전체'} <span class="mut" style="font-size:14px;font-weight:500">${g.nodes.length}명</span></div>`;
  const cv=$('#cv'),W=cv.width=cv.clientWidth*2,Hh=cv.height=Math.max(900,Math.min(2000,g.nodes.length*70));cv.style.height=Hh/2+'px';
@@ -180,5 +180,5 @@ $('#cv').onclick=ev=>{if(!G)return;const r=$('#cv').getBoundingClientRect(),x=(e
  const rel=G.edges.filter(e=>e.a===n.id||e.b===n.id).map(e=>({o:G.nodes.find(m=>m.id===(e.a===n.id?e.b:e.a)),e})).sort((a,b)=>b.e.score-a.e.score);
  $('#mapinfo').innerHTML=`<div class="hero" style="grid-template-columns:120px 1fr">${radar(n.elements,120,false,ELC[n.dm_el])}<div><b style="font-size:17px;color:var(--fg)">${n.name||n.alias}</b> ${tag(n.dm_el,n.dm_el+' '+ELW[n.dm_el])}${n.mbti?`<span class="tag">${n.mbti}</span>`:''}<br>`+rel.slice(0,5).map(r=>`<span style="color:var(--fg);font-weight:700">${r.e.score}</span> ${r.o.name||r.o.alias} <span class="mut">${r.e.why.slice(0,2).join(', ')}</span>`).join('<br>')+'</div></div>'};
 $('#g_dept').onchange=loadMap;
-api('/api/meta').then(()=>setTimeout(()=>{if(HASH)document.querySelector(`nav button[data-t=${HASH}]`)?.click()},400));
+api('api/meta').then(()=>setTimeout(()=>{if(HASH)document.querySelector(`nav button[data-t=${HASH}]`)?.click()},400));
 </script></body></html>
