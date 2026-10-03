@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, quote, urlparse
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(ROOT, "data")
+DATA = os.environ.get("WORKSPACE") or os.path.join(ROOT, "data")  # 포털이 AGENT_DATA/<도구> 로 모아 줌
 PEOPLE = os.path.join(DATA, "people.json")
 PORT = int(os.environ.get("PORT", "8766"))
 LLM_API = os.environ.get("LLM_API", "ollama")  # ollama | openai
