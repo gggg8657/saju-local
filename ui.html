@@ -12,7 +12,7 @@ h1{margin:0;font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1.1
 nav{max-width:1000px;margin:12px auto 0;padding:0 16px;display:flex;gap:2px;overflow-x:auto}
 nav button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;color:var(--mut);cursor:pointer;font-size:15px;white-space:nowrap}nav button.on{color:var(--fg);border-color:var(--fg);font-weight:700}nav button:focus-visible{outline:2px solid var(--acc);outline-offset:-2px}
 main{max-width:1000px;margin:0 auto;padding:20px 16px 60px}section{display:none}section.on{display:block}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:14px;overflow-wrap:anywhere}
 .card h2{margin:0 0 12px;font-size:17px;font-weight:700;letter-spacing:-.01em}
 label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px;font-weight:600}
 input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--fg);font-size:15px;font-family:inherit}input:focus,select:focus{outline:2px solid var(--acc);outline-offset:-1px}
@@ -22,12 +22,12 @@ button.p{background:var(--fg);color:var(--bg);border:0;padding:11px 18px;border-
 .err{color:var(--hwa);font-size:13px}.mut{color:var(--mut);font-size:13px}
 .ax{display:grid;grid-template-columns:64px 1fr 1fr 1fr;gap:4px;align-items:center;font-size:13px;margin:4px 0}.ax label{margin:0;text-align:center;cursor:pointer;padding:6px 4px;border:1px solid var(--line);border-radius:6px;color:var(--fg);font-weight:500}.ax input{position:absolute;opacity:0;width:0}.ax input:checked+span{font-weight:700;color:var(--acc)}.ax label:has(input:checked){background:var(--soft);border-color:var(--acc)}
 .chips label{display:inline-block;margin:3px 4px 3px 0;padding:5px 12px;border:1px solid var(--line);border-radius:99px;cursor:pointer;font-size:13px;color:var(--fg);font-weight:500}.chips input{position:absolute;opacity:0;width:0}.chips label:has(input:checked){background:var(--fg);color:var(--bg);border-color:var(--fg)}
-.hero{display:grid;grid-template-columns:220px 1fr;gap:20px;align-items:center}@media(max-width:640px){.hero{grid-template-columns:1fr}}
+.hero{display:grid;grid-template-columns:220px minmax(0,1fr);gap:20px;align-items:center}@media(max-width:640px){.hero{grid-template-columns:minmax(0,1fr)}}
 .big{font-size:38px;font-weight:800;letter-spacing:-.03em;line-height:1}.stars{color:var(--to);font-size:20px;letter-spacing:2px}
 .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px}.grid3>div{background:var(--soft);border-radius:10px;padding:14px}.grid3 b{display:block;font-size:12px;color:var(--mut);margin-bottom:6px;font-weight:600}
-.m{display:grid;grid-template-columns:56px 1fr auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}.m:last-child{border:0}.m .sc{font-size:26px;font-weight:800;letter-spacing:-.03em}
+.m{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}.m:last-child{border:0}.m .sc{font-size:26px;font-weight:800;letter-spacing:-.03em}
 canvas{width:100%;background:var(--card);border:1px solid var(--line);border-radius:14px;display:block}
-.b{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.b h3{margin:0 0 4px;font-size:19px;font-weight:800;letter-spacing:-.02em}
+.b{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}.b>div:first-child{flex:1 1 240px;min-width:0}.b h3{margin:0 0 4px;font-size:19px;font-weight:800;letter-spacing:-.02em}
 .pz{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}.pz .h{font-size:12px;color:var(--mut);font-weight:600}.pz .g{font-size:34px;font-weight:800;letter-spacing:.02em;line-height:1.1}.pz .s{font-size:12px;color:var(--mut)}.pz>div{background:var(--soft);border-radius:10px;padding:10px 4px}
 .du{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:6px}.du>div{border:1px solid var(--line);border-radius:8px;padding:8px 4px;text-align:center;font-size:12px;color:var(--mut)}.du b{display:block;font-size:18px;color:var(--fg);letter-spacing:.02em}.du .cur{border-color:var(--acc);background:var(--soft)}
 footer{max-width:1000px;margin:0 auto;padding:16px;color:var(--mut);font-size:12px;border-top:1px solid var(--line)}
