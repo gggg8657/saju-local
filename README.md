@@ -55,3 +55,11 @@ python3 report.py reports/people.txt --llm    # LLM 풀이 글까지 (reports/<�
 - 균시차 미적용(±15분), 출생지 경도는 127.5° 고정(`calc(lon=)`로 변경 가능).
 - 신강약·용신은 점수 규칙이라 유파에 따라 판단이 다를 수 있음. 경계값(부조 비율 0.45~0.55)은 중화로 표시.
 - 그래프는 O(n²) 스프링. 100명 넘으면 부서별로 보기.
+
+## 출처·감사 (Credits)
+
+- 파이썬 표준 라이브러리만 씁니다. 제3자 코드·데이터를 동봉하지 않습니다.
+- **LLM 실행** — OpenAI 호환 API 로 호출합니다(모델 가중치는 동봉하지 않음). 기본 배포는 [Ollama](https://github.com/ollama/ollama) (MIT) 위의 Google [Gemma](https://ai.google.dev/gemma) `gemma4:31b` — 모델 이용 조건은 Gemma 배포처 참고.
+- 이 도구는 [agent-page-portal](https://github.com/gggg8657/agent-page-portal) 에 연결해 쓰도록 만들었습니다(단독 실행도 됨).
+
+저작권 표기·전체 목록은 `NOTICE` 를 보세요.
