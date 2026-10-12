@@ -297,9 +297,8 @@ def create_bungae(req):
     return b
 
 
-def list_bungae(pid):
-    people = load(); me = find(people, pid)
-    if not me: raise ValueError("없는 ID")
+def list_bungae(pid, token):
+    people, me = auth(pid, token)
     byid = {p["id"]: p for p in people}
     cutoff = (now_kst() - timedelta(hours=3)).isoformat(timespec="minutes")
     out = []
@@ -375,10 +374,8 @@ def find(people, pid):
     return next((p for p in people if p["id"] == pid), None)
 
 
-def match(pid, scope, filters):
-    people = load()
-    me = find(people, pid)
-    if not me: raise ValueError("없는 ID")
+def match(pid, token, scope, filters):
+    people, me = auth(pid, token)
     cands = [p for p in people if p["id"] != pid]
     if scope == "dept": cands = [p for p in cands if p["dept"] == me["dept"]]
     else: cands = [p for p in cands if p.get("consent_global")]
@@ -407,9 +404,8 @@ def graph(dept):
     return {"nodes": nodes, "edges": edges, "balance": balance, "depts": sorted({p["dept"] for p in load()})}
 
 
-def today(pid):
-    people = load(); me = find(people, pid)
-    if not me: raise ValueError("없는 ID")
+def today(pid, token):
+    _, me = auth(pid, token)
     r = today_rule(me)
     cache = os.path.join(DATA, f"today-{r['date']}.json")
     try:
@@ -600,11 +596,11 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path); q = {k: v[0] for k, v in parse_qs(u.query).items()}
         try:
-            if u.path == "/api/match": return self._send(match(q.get("id"), q.get("scope", "all"), q))
+            if u.path == "/api/match": return self._send(match(q.get("id"), q.get("token"), q.get("scope", "all"), q))
             if u.path == "/api/graph": return self._send(graph(q.get("dept")))
-            if u.path == "/api/today": return self._send(today(q.get("id")))
+            if u.path == "/api/today": return self._send(today(q.get("id"), q.get("token")))
             if u.path == "/api/reading": return self._send(reading(q.get("id"), q.get("token")))
-            if u.path == "/api/bungae": return self._send(list_bungae(q.get("id")))
+            if u.path == "/api/bungae": return self._send(list_bungae(q.get("id"), q.get("token")))
             if u.path == "/api/me": return self._send(me_info(q.get("id"), q.get("token")))
             if u.path == "/api/status": return self._send(status())
             if u.path == "/api/fortune": return self._send(fortune_status(q.get("id"), q.get("token")))
@@ -637,4 +633,4 @@ class H(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     print(f"팀 밸런스 맵 → http://localhost:{PORT}  (api={LLM_API} base={BASE} model={MODEL})  {_SIG}")
-    ThreadingHTTPServer(("", PORT), H).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", ""), PORT), H).serve_forever()

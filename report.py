@@ -414,6 +414,8 @@ def from_record(rec, team, gender=None, text=None):
     """웹 리포트: 풀이 글(text)이 있으면 넣고, 같은 부서 사람(실명 공개 범위)과의 궁합을 표로 넣는다."""
     a = record_view(rec, gender)
     cross = sorted([(o, *compat(a, o)) for o in team if o["id"] != rec["id"]], key=lambda x: -x[1])[:15]
+    # 남의 년·월·일주는 생일 역산이 되므로 웹 리포트엔 일간만 (CLI 명단 리포트는 운영자 본인 자료라 그대로)
+    cross = [({**o, "pillars": [f"일간 {o['pillars'][2][0]}"]}, sc, why) for o, sc, why in cross]
     return html_report(a, fits_of(a), cross, f"우리 팀 궁합 ({rec['dept']})", text)
 
 
