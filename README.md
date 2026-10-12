@@ -2,6 +2,8 @@
 
 > 사주·MBTI·별자리·혈액형을 섞어 개인 성향 차트와 팀원 간 "협업 스타일 궁합"을 그래프로 보여주는 워크숍용 도구. 재미로 보는 것이며 과학적 근거가 없고 인사평가와 무관합니다.
 
+> ⚠️ 연구·내부 시험용 프로토타입입니다(배포·상업 서비스용 아님). 제3자 구성요소의 라이선스는 THIRD_PARTY_NOTICES.md 를 확인하세요.
+
 ![나·오늘 화면 — 기능 탭, 성향 차트, 사주 원국](docs/img/profile.png)
 
 ## 무엇을 하나
@@ -93,10 +95,16 @@ python3 report.py reports/people.txt --llm    # LLM 풀이 글까지 (reports/<�
 
 ## 출처·감사 (Credits)
 
-- 파이썬 표준 라이브러리만 씁니다. 제3자 코드·데이터를 동봉하지 않습니다.
-- **LLM 실행** — OpenAI 호환 API 로 호출합니다(모델 가중치는 동봉하지 않음). 기본 배포는 [Ollama](https://github.com/ollama/ollama) (MIT) 위의 Google [Gemma](https://ai.google.dev/gemma) `gemma4:31b` — 모델 이용 조건은 Gemma 배포처 참고.
+- 파이썬 표준 라이브러리만 씁니다. 제3자 코드·폰트·모델 가중치를 동봉하지 않습니다. 전체 목록: `THIRD_PARTY_NOTICES.md`.
+- **LLM 실행** — OpenAI 호환 API 로 호출합니다(모델 가중치는 동봉하지 않음). 기본 배포는 [Ollama](https://github.com/ollama/ollama) (MIT) 위의 Google [Gemma 4](https://ai.google.dev/gemma/docs/gemma_4_license) `gemma4:31b` (Apache-2.0). LLM 이 없으면 규칙 문장으로 대체됩니다.
+- **절기 계산** — VSOP87D 지구 급수(Bretagnon & Francou, J. Meeus 『Astronomical Algorithms』 절단표)와 Espenak–Meeus ΔT 다항식.
+- **명리 규칙·해설 문구** — 전통 규칙표를 바탕으로 저작자가 쓴 문장. 출처 기록 확인: [#1](https://github.com/gggg8657/saju-local/issues/1).
+- MBTI / Myers-Briggs Type Indicator 는 The Myers-Briggs Company 의 상표이며 이 도구는 그 회사와 관계가 없습니다.
 - 이 도구는 [agent-page-portal](https://github.com/gggg8657/agent-page-portal) 에 연결해 쓰도록 만들었습니다(단독 실행도 됨).
 
-저작권 표기·전체 목록은 `NOTICE` 를 보세요.
+저작권 표기는 `LICENSE`·`NOTICE` 를 보세요.
 
 All rights reserved. 저작자의 허락 없이 복제·배포·개작할 수 없습니다.
+
+## 만든 사람
+DongJu Kim (gggg8657) — 설계·구현
