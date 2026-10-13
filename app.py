@@ -165,7 +165,7 @@ SYSTEM = ("너는 사내 팀 워크숍용 '팀 밸런스 맵' 도우미다. 명�
           "건강·금전·연애·인사평가 언급 금지. 단정 대신 제안형. 한국어, 존댓말.")
 
 
-def llm(user, timeout=120, system=None):
+def llm(user, timeout=300, system=None):   # vLLM 대기열(다른 도구와 같이 씀)을 고려해 넉넉히
     msgs = [{"role": "system", "content": system or SYSTEM}, {"role": "user", "content": user}]
     if LLM_API == "openai":
         url, body = BASE + "/chat/completions", {"model": MODEL, "messages": msgs, "temperature": 0.7}
@@ -176,7 +176,7 @@ def llm(user, timeout=120, system=None):
         try:
             with urllib.request.urlopen(urllib.request.Request(url, json.dumps(body).encode(), hdr), timeout=timeout) as r:
                 j = json.load(r)
-            out = j["choices"][0]["message"]["content"] if LLM_API == "openai" else j["message"]["content"]
+            out = (j["choices"][0]["message"] if LLM_API == "openai" else j["message"]).get("content") or ""   # vLLM 은 빈 응답에 null
             return re.sub(r"<think>.*?</think>", "", out, flags=re.S).strip()
         except urllib.error.HTTPError as e:
             if attempt == 0 and "think" in body and "think" in e.read().decode(errors="replace"):
@@ -424,7 +424,7 @@ def today(pid, token):
             raw = llm(f"{describe(me)}\n오늘 일진 {r['day']}({r['day_god']}, 12운성 {r['unseong']}), 올해 세운 {r['year']['ganzi']}({r['year']['god']}), 이달 월운 {r['month']['ganzi']}({r['month']['god']}).\n"
                       f"오늘 테마: {r['theme_work']}, 컨디션 {r['stars']}/5, 협업 기운: {r['collab']}, 추천 점심: {r['menu']}.\n"
                       "아래 4줄을 정확히 이 접두어로 시작해서 써라. 각 줄 45자 이내, 연구원 대상, 구체적으로.\n"
-                      "팁: (오늘 업무 팁)\n연구: (오늘의 연구 운, 어떤 연구 활동이 잘 풀리는지)\n협업: (오늘의 협업 운)\n점심: (추천 메뉴를 왜 오늘 먹으면 좋은지 한 줄)", timeout=90)
+                      "팁: (오늘 업무 팁)\n연구: (오늘의 연구 운, 어떤 연구 활동이 잘 풀리는지)\n협업: (오늘의 협업 운)\n점심: (추천 메뉴를 왜 오늘 먹으면 좋은지 한 줄)", timeout=180)
             for line in raw.splitlines():
                 k, _, v = line.partition(":")
                 k, v = k.strip().lstrip("-•* "), v.strip()
