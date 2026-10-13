@@ -66,7 +66,7 @@ LLM_BASE_URL=http://gpu:8000/v1 LLM_API=openai LLM_MODEL=qwen3-32b python3 app.p
 리포트 페이지: 고정 목차, 본문 검색(하이라이트), 주제 바로가기, 섹션마다 "근거 보기", 인쇄용 CSS. 단일 HTML 파일이라 인터넷 없이 열린다.
 
 - 웹 UI: **나 · 오늘** 탭 맨 아래 "사주 풀이 리포트" → 성별 선택(연애·결혼운용, 계정에 저장 안 함) → **풀이 만들기**(gemma4:31b 기준 약 3분, 진행률 표시) → 리포트 보기 / HTML로 저장 / 다시 쓰기.
-  API: `POST /api/fortune {id, token, gender, regen}`, `GET /api/fortune?id=&token=`(진행 상태), `GET /report?id=&token=[&download=1]`.
+  API: `POST /api/fortune {id, token, gender, regen}`, `GET /api/fortune`(진행 상태, 헤더 `X-Saju-Id`·`X-Saju-Token`), `POST /report`(폼 본문 `id`·`token`[·`download=1`]). 본인 확인 값은 헤더나 POST 본문으로만 받고 URL 쿼리로는 받지 않는다.
   풀이 글은 `data/fortune/<id>.json`에 캐시(성별 포함, 본인 삭제 시 같이 삭제). 같은 부서 사람과의 궁합 표가 들어간다.
 - CLI (명단 일괄):
 ```bash
@@ -82,7 +82,7 @@ python3 report.py reports/people.txt --llm    # LLM 풀이 글까지 (reports/<�
 
 ## 개인정보
 - 생년월일시 원본·성별은 저장하지 않음. `data/people.json`에는 4주(8자)·분석 결과·출생 연도·별명만. 단, 8자와 출생 연도로 생일은 사실상 역산 가능하므로 파일 접근 권한을 관리할 것.
-- 본인 토큰(브라우저 localStorage)으로만 삭제·수정 가능. `?id=&token=` URL로 다른 브라우저에서 로그인.
+- 본인 토큰(브라우저 localStorage)으로만 삭제·수정 가능. `?id=&token=` 화면 주소로 다른 브라우저에서 로그인(화면이 읽자마자 localStorage 로 옮기고 주소에서 지움).
 - 개인 화면 API(`/api/me`·`/api/today`·`/api/match`·`/api/bungae`·`/api/reading`·`/api/fortune`·`/report`)는 모두 id + 본인 토큰이 있어야 열린다. 남의 id 만 알아서는 볼 수 없다.
 - **공유되는 것(일부러)**: 등록한 사람만 팀 맵·매칭·번개에 들어간다(등록 = 참여 동의). 같은 부서 맵·매칭에는 실명·부서·연령대·오행 분포·MBTI·혈액형·별자리·취미/성향이, 회사 전체 맵·매칭에는 "전체 공개 동의"한 사람만 별명으로 나온다. 4주(8자)·출생 연도·대운·풀이 글은 어떤 API 로도 남에게 나가지 않는다(웹 리포트의 팀 궁합 표도 상대는 일간만).
 - 포털 접속자별로 폴더를 나누지 않는다 — 사람 구분은 등록할 때 받은 id·토큰으로 한다(같은 사람이 다른 PC 에서도 `?id=&token=` 로 들어올 수 있게). 포털 밖 단독 실행은 `BIND` 환경변수가 없으면 예전처럼 모든 인터페이스에서 받는다.

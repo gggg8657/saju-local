@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """팀 밸런스 맵 — 사주·MBTI·별자리·혈액형 기반 팀 워크숍용 궁합/성향 지도. 표준 라이브러리만 사용.
    LLM(Ollama / OpenAI 호환)은 문장 생성에만 쓰고, 없으면 규칙 문장으로 대체된다."""
-import json, math, os, re, secrets, sys, threading, urllib.error, urllib.request
+import glob, json, math, os, re, secrets, sys, threading, urllib.error, urllib.request
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, quote, urlparse
@@ -250,7 +250,7 @@ def prefs(req):
 def update_prefs(req):
     with LOCK:
         people = load(); me = find(people, req.get("id"))
-        if not me or me["token"] != req.get("token"): raise ValueError("권한 없음")
+        if not me or not secrets.compare_digest(me["token"].encode(), str(req.get("token") or "").encode()): raise ValueError("권한 없음")
         me.update(prefs(req)); save(people)
     return {"ok": True, **prefs(req)}
 
@@ -283,7 +283,7 @@ def now_kst():
 
 def create_bungae(req):
     people = load(); host = find(people, req.get("id"))
-    if not host or host["token"] != req.get("token"): raise ValueError("권한 없음")
+    if not host or not secrets.compare_digest(host["token"].encode(), str(req.get("token") or "").encode()): raise ValueError("권한 없음")
     title, place = (req.get("title") or "").strip()[:40], (req.get("place") or "").strip()[:40]
     hobby = (req.get("hobby") or "").strip()[:12]
     if not (title and place and hobby): raise ValueError("제목·장소·취미 태그는 필수")
@@ -320,7 +320,7 @@ def list_bungae(pid, token):
 
 def join_bungae(req, leave=False):
     people = load(); me = find(people, req.get("id"))
-    if not me or me["token"] != req.get("token"): raise ValueError("권한 없음")
+    if not me or not secrets.compare_digest(me["token"].encode(), str(req.get("token") or "").encode()): raise ValueError("권한 없음")
     with LOCK:
         items = load_b(); b = next((x for x in items if x["id"] == req.get("bid")), None)
         if not b: raise ValueError("없는 번개")
@@ -392,8 +392,13 @@ def match(pid, token, scope, filters):
     return out[:10]
 
 
-def graph(dept):
-    people = [p for p in load() if (p["dept"] == dept if dept else p.get("consent_global"))]
+def graph(dept, viewer=None, owner=False):
+    """dept 가 있으면 실명 팀 지도 — 그 부서에 등록한 본인(viewer, id+token 확인됨)이나 owner 만.
+    dept 가 없으면 회사 전체 — consent_global 인 사람만 별명으로. depts 목록은 볼 수 있는 부서만."""
+    everyone = load()
+    if dept and not owner and not (viewer and viewer["dept"] == dept):
+        raise PermissionError("이 부서 지도는 그 부서에 등록한 본인이나 관리자만 볼 수 있습니다")
+    people = [p for p in everyone if (p["dept"] == dept if dept else p.get("consent_global"))]
     nodes = [public(p, reveal=bool(dept)) for p in people]
     edges = []
     for i in range(len(people)):
@@ -401,7 +406,8 @@ def graph(dept):
             s, why = compat(people[i], people[j])
             edges.append({"a": people[i]["id"], "b": people[j]["id"], "score": s, "why": why})
     balance = {e: sum(p["elements"][e] for p in people) for e in EL}
-    return {"nodes": nodes, "edges": edges, "balance": balance, "depts": sorted({p["dept"] for p in load()})}
+    depts = sorted({p["dept"] for p in everyone}) if owner else [viewer["dept"]] if viewer else []
+    return {"nodes": nodes, "edges": edges, "balance": balance, "depts": depts}
 
 
 def today(pid, token):
@@ -439,7 +445,7 @@ def today(pid, token):
 
 def reading(pid, token):
     people = load(); me = find(people, pid)
-    if not me or me["token"] != token: raise ValueError("권한 없음")
+    if not me or not secrets.compare_digest(me["token"].encode(), str(token or "").encode()): raise ValueError("권한 없음")
     if not me.get("reading"):
         try:
             work = llm(f"{describe(me)}\n이 사람의 (1) 일하는 스타일 (2) 팀에서 잘 맞는 역할 (3) 주의할 점 (4) 잘 맞는 동료 유형을 "
@@ -461,7 +467,7 @@ JOBS = {}  # id → {"done": [...], "total": n, "error": str|None}
 
 def auth(pid, token):
     people = load(); me = find(people, pid)
-    if not me or me["token"] != token: raise ValueError("권한 없음")
+    if not me or not secrets.compare_digest(me["token"].encode(), str(token or "").encode()): raise ValueError("권한 없음")
     return people, me
 
 
@@ -544,7 +550,7 @@ def models_list():
 
 def me_info(pid, token):
     p = find(load(), pid)
-    if not p or p["token"] != token: raise ValueError("권한 없음")
+    if not p or not secrets.compare_digest(p["token"].encode(), str(token or "").encode()): raise ValueError("권한 없음")
     full = {k: p[k] for k in ("pillars", "tens", "power", "support_ratio", "deukryeong", "rooted", "gyeok", "gyeok_god", "yong", "hui", "gi",
                               "yong_why", "johu", "gongmang", "gongmang_hit", "relations", "daeun", "unseong_day", "dm_yin", "lmt", "hour_known", "birth_year") if k in p}
     return {**public(p, reveal=True), **full, "wants": p["wants"], "consent_global": p["consent_global"]}
@@ -553,10 +559,20 @@ def me_info(pid, token):
 def delete(pid, token):
     with LOCK:
         people = load(); me = find(people, pid)
-        if not me or me["token"] != token: raise ValueError("권한 없음")
+        if not me or not secrets.compare_digest(me["token"].encode(), str(token or "").encode()): raise ValueError("권한 없음")
         save([p for p in people if p["id"] != pid])
         try: os.remove(os.path.join(FORTUNE, pid + ".json"))
         except FileNotFoundError: pass
+        JOBS.pop(pid, None)
+        for cache in glob.glob(os.path.join(DATA, "today-*.json")):  # 오늘의 운 캐시에서도 그 사람 항목을 지운다
+            try:
+                with open(cache, encoding="utf-8") as f: c = json.load(f)
+            except (OSError, ValueError):
+                continue
+            if isinstance(c, dict) and pid in c:
+                del c[pid]
+                with open(cache + ".tmp", "w", encoding="utf-8") as f: json.dump(c, f, ensure_ascii=False)
+                os.replace(cache + ".tmp", cache)
         items = [b for b in load_b() if b["host"] != pid]
         for b in items: b["members"] = [m for m in b["members"] if m != pid]
         save_b(items)
@@ -593,30 +609,60 @@ class H(BaseHTTPRequestHandler):
         if filename: self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + quote(filename))
         self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
 
+    def _cred(self, body=None):
+        """본인 확인용 id·token — 헤더(X-Saju-Id·X-Saju-Token) 또는 POST 본문. URL 쿼리는 받지 않는다(로그·기록·링크로 샘)."""
+        body = body or {}
+        return (body.get("id") or self.headers.get("X-Saju-Id") or None,
+                body.get("token") or self.headers.get("X-Saju-Token") or None)
+
+    def _owner(self):
+        return (self.headers.get("X-Agent-User") or "owner").strip() == "owner"
+
+    def _viewer(self):
+        pid, token = self._cred()
+        if not pid and not token: return None
+        try: return auth(pid, token)[1]
+        except ValueError: return None  # 틀린 토큰이면 손님(회사 전체 지도만)
+
+    def _report(self, pid, token, download):
+        body = report_html(pid, token)
+        return self._send(signed(body.decode()).encode(), ctype="text/html", filename=f"사주리포트_{find(load(), pid)['name']}.html" if download else None)
+
     def do_GET(self):
         u = urlparse(self.path); q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        q.pop("id", None); q.pop("token", None)  # 쿼리의 id·token 은 무시
         try:
-            if u.path == "/api/match": return self._send(match(q.get("id"), q.get("token"), q.get("scope", "all"), q))
-            if u.path == "/api/graph": return self._send(graph(q.get("dept")))
-            if u.path == "/api/today": return self._send(today(q.get("id"), q.get("token")))
-            if u.path == "/api/reading": return self._send(reading(q.get("id"), q.get("token")))
-            if u.path == "/api/bungae": return self._send(list_bungae(q.get("id"), q.get("token")))
-            if u.path == "/api/me": return self._send(me_info(q.get("id"), q.get("token")))
+            if u.path == "/api/match": return self._send(match(*self._cred(), q.get("scope", "all"), q))
+            if u.path == "/api/graph": return self._send(graph(q.get("dept"), self._viewer(), self._owner()))
+            if u.path == "/api/today": return self._send(today(*self._cred()))
+            if u.path == "/api/reading": return self._send(reading(*self._cred()))
+            if u.path == "/api/bungae": return self._send(list_bungae(*self._cred()))
+            if u.path == "/api/me": return self._send(me_info(*self._cred()))
             if u.path == "/api/status": return self._send(status())
-            if u.path == "/api/fortune": return self._send(fortune_status(q.get("id"), q.get("token")))
-            if u.path == "/report":
-                pid = q.get("id"); body = report_html(pid, q.get("token"))
-                return self._send(signed(body.decode()).encode(), ctype="text/html", filename=f"사주리포트_{find(load(), pid)['name']}.html" if q.get("download") else None)
+            if u.path == "/api/fortune": return self._send(fortune_status(*self._cred()))
+            if u.path == "/report": return self._report(*self._cred(), q.get("download"))
             if u.path == "/api/meta": return self._send({"axes": AXES, "labels": AXIS_LABEL, "hobbies": HOBBIES})
             with open(os.path.join(ROOT, "ui.html"), encoding="utf-8") as f: return self._send(signed(f.read()).encode(), ctype="text/html")
+        except PermissionError as e:
+            self._send({"error": str(e)}, 403)
         except ValueError as e:
             self._send({"error": str(e)}, 400)
         except Exception as e:
             self._send({"error": f"{type(e).__name__}: {e}"}, 500)
 
     def do_POST(self):
-        req = json.loads(self.rfile.read(int(self.headers["Content-Length"])) or b"{}")
+        raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
         try:
+            if self.path == "/report":  # 화면이 새 창으로 여는 리포트 — 폼 본문(id·token·download)으로 받는다
+                f = {k: v[0] for k, v in parse_qs(raw.decode("utf-8", "replace")).items()}
+                return self._report(f.get("id"), f.get("token"), f.get("download"))
+            try:
+                req = json.loads(raw or b"{}")
+            except ValueError:
+                return self._send({"error": "잘못된 요청 (JSON 이 아님)"}, 400)
+            if not isinstance(req, dict): return self._send({"error": "잘못된 요청 (JSON 객체여야 함)"}, 400)
+            pid, token = self._cred(req)
+            req = {**req, "id": pid, "token": token}
             if self.path == "/api/register": return self._send(register(req))
             if self.path == "/api/delete": return self._send(delete(req.get("id"), req.get("token")))
             if self.path == "/api/prefs": return self._send(update_prefs(req))

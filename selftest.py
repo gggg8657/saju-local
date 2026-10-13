@@ -57,4 +57,39 @@ import base64 as _b
 _h = app.signed(open(os.path.join(app.ROOT, 'ui.html'), encoding='utf-8').read().replace("data-sig", "").replace('name="author"', ""))
 assert "data-sig" in _h and 'name="author"' in _h and _b.b64decode("ZG9uZ2p1a2ltLmRldkBnbWFpbC5jb20=").decode() in _h, "저작권 표기 누락"
 
+# HTTP: 토큰은 헤더로만(쿼리 무시), 부서 지도는 본인 부서·owner 만, 삭제 시 오늘의 운 캐시에서도 지움 — 임시 폴더에서
+import json, tempfile, threading, urllib.request, urllib.error, urllib.parse
+_tmp = tempfile.mkdtemp(prefix="saju-selftest-")
+app.DATA, app.PEOPLE, app.BUNGAE, app.FORTUNE = _tmp, os.path.join(_tmp, "people.json"), os.path.join(_tmp, "bungae.json"), os.path.join(_tmp, "fortune")
+app.llm = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("LLM 없음"))
+_srv = app.ThreadingHTTPServer(("127.0.0.1", 0), app.H); threading.Thread(target=_srv.serve_forever, daemon=True).start()
+_B = f"http://127.0.0.1:{_srv.server_address[1]}"
+def _call(path, body=None, hdr=None, user=None):
+    h = {**(hdr or {}), **({"X-Agent-User": user} if user else {})}
+    r = urllib.request.Request(_B + path, json.dumps(body).encode() if body is not None else None, h)
+    try:
+        with urllib.request.urlopen(r) as f: return f.status, f.read()
+    except urllib.error.HTTPError as e: return e.code, e.read()
+_base = {"year": 1990, "month": 5, "day": 3, "hour": 10, "dept": "시험부서"}
+_a = json.loads(_call("/api/register", {**_base, "name": "갑"})[1]); _b = json.loads(_call("/api/register", {**_base, "name": "을", "dept": "다른부서"})[1])
+_ha = {"X-Saju-Id": _a["id"], "X-Saju-Token": _a["token"]}
+assert _call("/api/me", hdr=_ha, user="u1")[0] == 200
+assert _call(f"/api/me?id={_a['id']}&token={_a['token']}", user="u1")[0] == 400, "쿼리 토큰은 받지 않아야 함"
+_q = "/api/graph?dept=" + urllib.parse.quote("시험부서")
+assert _call(_q, user="u1")[0] == 403, "토큰 없이 부서 지도"
+assert _call(_q, hdr={"X-Saju-Id": _b["id"], "X-Saju-Token": _b["token"]}, user="u1")[0] == 403, "다른 부서 사람이 부서 지도"
+_c, _g = _call(_q, hdr=_ha, user="u1"); _g = json.loads(_g)
+assert _c == 200 and _g["nodes"][0]["name"] == "갑" and _g["depts"] == ["시험부서"], _g
+_c, _g = _call(_q, user="owner"); assert _c == 200 and set(json.loads(_g)["depts"]) == {"시험부서", "다른부서"}
+_g = json.loads(_call("/api/graph?dept=", user="u1")[1]); assert _g["depts"] == [] and all("name" not in n for n in _g["nodes"])
+assert _call("/api/today", hdr=_ha, user="u1")[0] == 200
+_tc = os.path.join(_tmp, "today-2000-01-01.json"); json.dump({_a["id"]: {"text": "x"}, "other": {"text": "y"}}, open(_tc, "w"))
+os.makedirs(app.FORTUNE, exist_ok=True); open(os.path.join(app.FORTUNE, _a["id"] + ".json"), "w").write("{}")
+assert _call("/api/delete", {}, hdr=_ha, user="u1")[0] == 200
+assert json.load(open(_tc)) == {"other": {"text": "y"}} and not os.path.exists(os.path.join(app.FORTUNE, _a["id"] + ".json"))
+assert _call("/api/me", hdr=_ha, user="u1")[0] == 400
+try: urllib.request.urlopen(urllib.request.Request(_B + "/api/register", b"not json")); raise AssertionError("잘못된 JSON 통과")
+except urllib.error.HTTPError as e: assert e.code == 400
+_srv.shutdown(); import shutil; shutil.rmtree(_tmp, ignore_errors=True)
+
 print("selftest ok")
