@@ -225,6 +225,98 @@ def save(people):
     os.replace(tmp, PEOPLE)
 
 
+# ── 포털 계정: 등록 주인·이름·부서는 X-Agent-User 의 포털 계정에서 (자칭 부서·이름 사칭 막기) ──
+PORTAL_DB = os.environ.get("PORTAL_DB") or os.path.join(os.environ.get("AGENT_DATA") or os.path.join(os.path.dirname(ROOT), "_data"), "portal.db")
+CUR = threading.local()  # 요청마다 handler 가 CUR.acct 를 채움(ThreadingHTTPServer = 요청당 스레드)
+NO_DEPT = "포털 계정에 부서가 정해져 있지 않습니다 — 포털 '내 정보'에서 부서를 신청해 승인받은 뒤 쓸 수 있어요"
+
+
+def account(uid):
+    """X-Agent-User → {uid, name, dept, admin}. 포털 DB(users)를 읽기 전용으로 — 못 읽거나 비활성 계정이면 부서 없음."""
+    import sqlite3
+    a = {"uid": uid, "name": "", "dept": "", "admin": uid == "owner"}
+    if uid == "owner" or not os.path.exists(PORTAL_DB): return a
+    try:
+        c = sqlite3.connect(f"file:{quote(PORTAL_DB)}?mode=ro", uri=True, timeout=5)
+        try: r = c.execute("SELECT name, dept, disabled, deactivated FROM users WHERE id=?", (uid,)).fetchone()
+        finally: c.close()
+    except sqlite3.Error:
+        return a
+    if r and not r[2] and not r[3]: a["name"], a["dept"] = (r[0] or uid)[:20], (r[1] or "")[:30]
+    return a
+
+
+def cur():
+    return getattr(CUR, "acct", None) or {"uid": "owner", "name": "", "dept": "", "admin": True}  # CLI·시험은 관리자
+
+
+def owns(p, token):
+    """토큰이 맞고, 계정에 연결된 프로필이면 그 계정(또는 관리자)일 때만."""
+    if not secrets.compare_digest(p["token"].encode(), str(token or "").encode()): return False
+    a = cur()
+    return not p.get("account") or p["account"] == a["uid"] or a["admin"]
+
+
+def mine(people):
+    """지금 계정에 연결된 내 프로필(관리자 'owner' 는 포털 계정이 아니라 없음)."""
+    a = cur()
+    return None if a["uid"] == "owner" else next((p for p in people if p.get("account") == a["uid"]), None)
+
+
+def need_linked(me):
+    if not me.get("account") and not cur()["admin"]:
+        raise PermissionError("계정에 연결되지 않은 예전 등록입니다 — 고치거나 지우는 건 관리자만 할 수 있어요(새로 등록하면 계정에 연결된 프로필이 생깁니다)")
+
+
+def account_info():
+    """화면용: 내 계정 이름·부서 + 계정에 연결된 내 프로필(id·token — 같은 계정만 쓸 수 있으니 다른 기기에서도 이어 쓰기)."""
+    a = cur(); p = mine(load())
+    return {"name": a["name"], "dept": a["dept"], "admin": a["admin"], "no_dept": NO_DEPT if not a["dept"] else "",
+            "mine": {"id": p["id"], "token": p["token"], "alias": p["alias"]} if p else None}
+
+
+def link_accounts():
+    """예전 등록(계정 없음)을 이름+부서가 정확히 한 계정과 같을 때만 연결. 개수만 돌려줌(실명 출력 안 함)."""
+    import sqlite3
+    c = sqlite3.connect(f"file:{quote(PORTAL_DB)}?mode=ro", uri=True, timeout=5)
+    try: users = c.execute("SELECT id, name, dept FROM users WHERE COALESCE(disabled,0)=0 AND deactivated IS NULL").fetchall()
+    finally: c.close()
+    out = {"linked": 0, "unlinked": 0, "already": 0}
+    with LOCK:
+        people = load(); taken = {p["account"] for p in people if p.get("account")}
+        for p in people:
+            if p.get("account"): out["already"] += 1; continue
+            hit = [u for u in users if (u[1] or "").strip() == p["name"].strip() and (u[2] or "").strip() == p["dept"].strip()]
+            if len(hit) == 1 and hit[0][0] not in taken:
+                p["account"] = hit[0][0]; taken.add(hit[0][0]); out["linked"] += 1
+            else:
+                out["unlinked"] += 1
+        save(people)
+    return out
+
+
+def admin_people():
+    if not cur()["admin"]: raise PermissionError("관리자만")
+    return [{"id": p["id"], "name": p["name"], "dept": p["dept"], "alias": p["alias"], "account": p.get("account"), "created": p.get("created")} for p in load()]
+
+
+def admin_fix(req):
+    """관리자: 프로필 지우기(action=delete) 또는 계정 연결(action=link, account=<포털 아이디>) — 연결하면 이름·부서를 그 계정 것으로."""
+    if not cur()["admin"]: raise PermissionError("관리자만")
+    with LOCK:
+        people = load(); p = find(people, req.get("pid"))
+        if not p: raise ValueError("없는 프로필")
+        if req.get("action") == "delete":
+            return drop(people, p["id"])
+        if req.get("action") != "link": raise ValueError("action 은 delete·link")
+        uid = str(req.get("account") or "")
+        a = account(uid)
+        if not a["dept"]: raise ValueError("부서가 정해진 포털 계정이 아닙니다")
+        if any(x.get("account") == uid and x is not p for x in people): raise ValueError("그 계정에는 이미 프로필이 있습니다")
+        p.update({"account": uid, "name": a["name"], "dept": a["dept"]}); save(people)
+    return {"ok": True}
+
+
 def public(p, reveal=False):
     keys = ["id", "alias", "dept", "age_band", "day_master", "dm_el", "elements", "ten_gods", "strength", "mbti", "zodiac", "blood", "dominant", "lacking", "hobbies", "traits", "gyeok", "yong", "power"]
     d = {k: p.get(k) for k in keys}
@@ -250,7 +342,8 @@ def prefs(req):
 def update_prefs(req):
     with LOCK:
         people = load(); me = find(people, req.get("id"))
-        if not me or not secrets.compare_digest(me["token"].encode(), str(req.get("token") or "").encode()): raise ValueError("권한 없음")
+        if not me or not owns(me, req.get("token")): raise ValueError("권한 없음")
+        need_linked(me)
         me.update(prefs(req)); save(people)
     return {"ok": True, **prefs(req)}
 
@@ -283,7 +376,7 @@ def now_kst():
 
 def create_bungae(req):
     people = load(); host = find(people, req.get("id"))
-    if not host or not secrets.compare_digest(host["token"].encode(), str(req.get("token") or "").encode()): raise ValueError("권한 없음")
+    if not host or not owns(host, req.get("token")): raise ValueError("권한 없음")
     title, place = (req.get("title") or "").strip()[:40], (req.get("place") or "").strip()[:40]
     hobby = (req.get("hobby") or "").strip()[:12]
     if not (title and place and hobby): raise ValueError("제목·장소·취미 태그는 필수")
@@ -320,7 +413,7 @@ def list_bungae(pid, token):
 
 def join_bungae(req, leave=False):
     people = load(); me = find(people, req.get("id"))
-    if not me or not secrets.compare_digest(me["token"].encode(), str(req.get("token") or "").encode()): raise ValueError("권한 없음")
+    if not me or not owns(me, req.get("token")): raise ValueError("권한 없음")
     with LOCK:
         items = load_b(); b = next((x for x in items if x["id"] == req.get("bid")), None)
         if not b: raise ValueError("없는 번개")
@@ -337,8 +430,9 @@ def join_bungae(req, leave=False):
 
 
 def register(req):
-    name, dept = (req.get("name") or "").strip()[:20], (req.get("dept") or "").strip()[:30]
-    if not name or not dept: raise ValueError("이름·부서는 필수")
+    a = cur()  # 이름·부서는 포털 계정 것(요청값은 안 씀), 한 계정 = 내 프로필 1건
+    if not a["dept"] or a["uid"] == "owner": raise PermissionError(NO_DEPT)
+    name, dept = a["name"], a["dept"]
     y, m, d = int(req["year"]), int(req["month"]), int(req["day"])
     if not 1920 <= y <= date.today().year: raise ValueError("연도 범위")
     hh = req.get("hour"); hh = None if hh in (None, "", "unknown") else int(hh)
@@ -364,7 +458,10 @@ def register(req):
            "day_branch": pillars[2][1], "consent_global": bool(req.get("consent_global", True)),
            "created": date.today().isoformat(), **prefs(req), **p}
     # 생년월일시 원본·성별은 저장 안 함. 4주(8자)·분석 결과·출생 연도만 남김 (8자로 생일 역산은 가능 — README 참고)
+    rec["account"] = a["uid"]
     with LOCK:
+        for old in [p for p in load() if p.get("account") == a["uid"]]:  # 다시 등록 = 내 예전 프로필을 바꿔 끼움
+            drop(load(), old["id"])
         people = load(); people.append(rec); save(people)
     return {"id": rec["id"], "token": rec["token"], "alias": rec["alias"],
             "pillars": p["pillars"], "profile": p, "zodiac": rec["zodiac"]}
@@ -377,7 +474,11 @@ def find(people, pid):
 def match(pid, token, scope, filters):
     people, me = auth(pid, token)
     cands = [p for p in people if p["id"] != pid]
-    if scope == "dept": cands = [p for p in cands if p["dept"] == me["dept"]]
+    if scope == "dept":
+        a = cur()
+        if not a["dept"]: raise PermissionError(NO_DEPT)
+        if me.get("account") != a["uid"]: raise PermissionError("우리 팀(실명) 매칭은 계정에 연결된 내 프로필로만 볼 수 있어요")
+        cands = [p for p in cands if p["dept"] == a["dept"]]
     else: cands = [p for p in cands if p.get("consent_global")]
     for k in ("age_band", "dept", "mbti", "dm_el", "blood"):
         if filters.get(k): cands = [p for p in cands if p.get(k) == filters[k]]
@@ -395,9 +496,11 @@ def match(pid, token, scope, filters):
 def graph(dept, viewer=None, owner=False):
     """dept 가 있으면 실명 팀 지도 — 그 부서에 등록한 본인(viewer, id+token 확인됨)이나 owner 만.
     dept 가 없으면 회사 전체 — consent_global 인 사람만 별명으로. depts 목록은 볼 수 있는 부서만."""
-    everyone = load()
-    if dept and not owner and not (viewer and viewer["dept"] == dept):
-        raise PermissionError("이 부서 지도는 그 부서에 등록한 본인이나 관리자만 볼 수 있습니다")
+    everyone = load(); a = cur()
+    if dept and not owner:
+        if not a["dept"]: raise PermissionError(NO_DEPT)
+        if dept != a["dept"] or not mine(everyone):
+            raise PermissionError("부서 지도는 포털 계정 부서의 것만, 그 계정으로 등록한 뒤 볼 수 있습니다")
     people = [p for p in everyone if (p["dept"] == dept if dept else p.get("consent_global"))]
     nodes = [public(p, reveal=bool(dept)) for p in people]
     edges = []
@@ -406,7 +509,7 @@ def graph(dept, viewer=None, owner=False):
             s, why = compat(people[i], people[j])
             edges.append({"a": people[i]["id"], "b": people[j]["id"], "score": s, "why": why})
     balance = {e: sum(p["elements"][e] for p in people) for e in EL}
-    depts = sorted({p["dept"] for p in everyone}) if owner else [viewer["dept"]] if viewer else []
+    depts = sorted({p["dept"] for p in everyone}) if owner else [a["dept"]] if a["dept"] and mine(everyone) else []
     return {"nodes": nodes, "edges": edges, "balance": balance, "depts": depts}
 
 
@@ -445,7 +548,7 @@ def today(pid, token):
 
 def reading(pid, token):
     people = load(); me = find(people, pid)
-    if not me or not secrets.compare_digest(me["token"].encode(), str(token or "").encode()): raise ValueError("권한 없음")
+    if not me or not owns(me, token): raise ValueError("권한 없음")
     if not me.get("reading"):
         try:
             work = llm(f"{describe(me)}\n이 사람의 (1) 일하는 스타일 (2) 팀에서 잘 맞는 역할 (3) 주의할 점 (4) 잘 맞는 동료 유형을 "
@@ -467,7 +570,7 @@ JOBS = {}  # id → {"done": [...], "total": n, "error": str|None}
 
 def auth(pid, token):
     people = load(); me = find(people, pid)
-    if not me or not secrets.compare_digest(me["token"].encode(), str(token or "").encode()): raise ValueError("권한 없음")
+    if not me or not owns(me, token): raise ValueError("권한 없음")
     return people, me
 
 
@@ -550,32 +653,38 @@ def models_list():
 
 def me_info(pid, token):
     p = find(load(), pid)
-    if not p or not secrets.compare_digest(p["token"].encode(), str(token or "").encode()): raise ValueError("권한 없음")
+    if not p or not owns(p, token): raise ValueError("권한 없음")
     full = {k: p[k] for k in ("pillars", "tens", "power", "support_ratio", "deukryeong", "rooted", "gyeok", "gyeok_god", "yong", "hui", "gi",
                               "yong_why", "johu", "gongmang", "gongmang_hit", "relations", "daeun", "unseong_day", "dm_yin", "lmt", "hour_known", "birth_year") if k in p}
-    return {**public(p, reveal=True), **full, "wants": p["wants"], "consent_global": p["consent_global"]}
+    return {**public(p, reveal=True), **full, "wants": p["wants"], "consent_global": p["consent_global"], "linked": bool(p.get("account"))}
 
 
 def delete(pid, token):
     with LOCK:
         people = load(); me = find(people, pid)
-        if not me or not secrets.compare_digest(me["token"].encode(), str(token or "").encode()): raise ValueError("권한 없음")
-        save([p for p in people if p["id"] != pid])
-        try: os.remove(os.path.join(FORTUNE, pid + ".json"))
-        except FileNotFoundError: pass
-        JOBS.pop(pid, None)
-        for cache in glob.glob(os.path.join(DATA, "today-*.json")):  # 오늘의 운 캐시에서도 그 사람 항목을 지운다
-            try:
-                with open(cache, encoding="utf-8") as f: c = json.load(f)
-            except (OSError, ValueError):
-                continue
-            if isinstance(c, dict) and pid in c:
-                del c[pid]
-                with open(cache + ".tmp", "w", encoding="utf-8") as f: json.dump(c, f, ensure_ascii=False)
-                os.replace(cache + ".tmp", cache)
-        items = [b for b in load_b() if b["host"] != pid]
-        for b in items: b["members"] = [m for m in b["members"] if m != pid]
-        save_b(items)
+        if not me or not owns(me, token): raise ValueError("권한 없음")
+        need_linked(me)
+        return drop(people, pid)
+
+
+def drop(people, pid):
+    """프로필 하나와 딸린 것(풀이 캐시·오늘의 운 캐시·번개)을 지움 — LOCK 안에서 부를 것."""
+    save([p for p in people if p["id"] != pid])
+    try: os.remove(os.path.join(FORTUNE, pid + ".json"))
+    except FileNotFoundError: pass
+    JOBS.pop(pid, None)
+    for cache in glob.glob(os.path.join(DATA, "today-*.json")):  # 오늘의 운 캐시에서도 그 사람 항목을 지운다
+        try:
+            with open(cache, encoding="utf-8") as f: c = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if isinstance(c, dict) and pid in c:
+            del c[pid]
+            with open(cache + ".tmp", "w", encoding="utf-8") as f: json.dump(c, f, ensure_ascii=False)
+            os.replace(cache + ".tmp", cache)
+    items = [b for b in load_b() if b["host"] != pid]
+    for b in items: b["members"] = [m for m in b["members"] if m != pid]
+    save_b(items)
     return {"ok": True}
 
 
@@ -629,6 +738,7 @@ class H(BaseHTTPRequestHandler):
         return self._send(signed(body.decode()).encode(), ctype="text/html", filename=f"사주리포트_{find(load(), pid)['name']}.html" if download else None)
 
     def do_GET(self):
+        CUR.acct = account((self.headers.get("X-Agent-User") or "owner").strip())
         u = urlparse(self.path); q = {k: v[0] for k, v in parse_qs(u.query).items()}
         q.pop("id", None); q.pop("token", None)  # 쿼리의 id·token 은 무시
         try:
@@ -639,6 +749,8 @@ class H(BaseHTTPRequestHandler):
             if u.path == "/api/bungae": return self._send(list_bungae(*self._cred()))
             if u.path == "/api/me": return self._send(me_info(*self._cred()))
             if u.path == "/api/status": return self._send(status())
+            if u.path == "/api/account": return self._send(account_info())
+            if u.path == "/api/admin/people": return self._send(admin_people())
             if u.path == "/api/fortune": return self._send(fortune_status(*self._cred()))
             if u.path == "/report": return self._report(*self._cred(), q.get("download"))
             if u.path == "/api/meta": return self._send({"axes": AXES, "labels": AXIS_LABEL, "hobbies": HOBBIES})
@@ -651,6 +763,7 @@ class H(BaseHTTPRequestHandler):
             self._send({"error": f"{type(e).__name__}: {e}"}, 500)
 
     def do_POST(self):
+        CUR.acct = account((self.headers.get("X-Agent-User") or "owner").strip())
         raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
         try:
             if self.path == "/report":  # 화면이 새 창으로 여는 리포트 — 폼 본문(id·token·download)으로 받는다
@@ -664,6 +777,7 @@ class H(BaseHTTPRequestHandler):
             pid, token = self._cred(req)
             req = {**req, "id": pid, "token": token}
             if self.path == "/api/register": return self._send(register(req))
+            if self.path == "/api/admin/fix": return self._send(admin_fix(req))
             if self.path == "/api/delete": return self._send(delete(req.get("id"), req.get("token")))
             if self.path == "/api/prefs": return self._send(update_prefs(req))
             if self.path == "/api/fortune": return self._send(fortune_start(req))
@@ -671,12 +785,16 @@ class H(BaseHTTPRequestHandler):
             if self.path == "/api/bungae/join": return self._send(join_bungae(req))
             if self.path == "/api/bungae/leave": return self._send(join_bungae(req, leave=True))
             self._send({"error": "no route"}, 404)
+        except PermissionError as e:
+            self._send({"error": str(e)}, 403)
         except (ValueError, KeyError) as e:
             self._send({"error": f"입력 오류: {e}"}, 400)
         except Exception as e:
             self._send({"error": f"{type(e).__name__}: {e}"}, 500)
 
 
+if __name__ == "__main__" and sys.argv[1:] == ["--link-accounts"]:  # 예전 등록을 포털 계정에 연결(한 번) — 개수만 출력
+    print(json.dumps(link_accounts(), ensure_ascii=False)); sys.exit(0)
 if __name__ == "__main__":
     print(f"팀 밸런스 맵 → http://localhost:{PORT}  (api={LLM_API} base={BASE} model={MODEL})  {_SIG}")
     ThreadingHTTPServer((os.environ.get("BIND", ""), PORT), H).serve_forever()

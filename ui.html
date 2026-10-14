@@ -38,7 +38,7 @@ footer{max-width:1000px;margin:0 auto;padding:16px;color:var(--mut);font-size:12
 <main>
 <section id="reg" class="on"><div class="card"><h2>내 정보 등록</h2>
 <p class="mut">생년월일시는 저장하지 않습니다. 계산된 성향 분포와 일주만 남고, 전사 매칭에서는 별명으로만 보입니다.</p>
-<div class="row"><div><label>이름</label><input id="name"></div><div><label>부서(팀)</label><input id="dept"></div></div>
+<div class="row"><div><label>이름 · 부서 <span class="mut" style="font-weight:500">(포털 계정 것 — 바꾸려면 포털 내 정보에서)</span></label><div id="acct" class="mut" style="padding:8px 0">계정 확인 중…</div></div></div>
 <div class="row"><div><label>생년</label><input id="year" type="number" placeholder="1990"></div><div><label>월</label><input id="month" type="number" min="1" max="12"></div><div><label>일</label><input id="day" type="number" min="1" max="31"></div>
 <div><label>출생 시</label><select id="hour"><option value="unknown">모름</option></select></div><div><label>분</label><input id="minute" type="number" min="0" max="59" value="0"></div></div>
 <div class="row"><div><label>MBTI (선택)</label><input id="mbti" placeholder="INTJ" maxlength="4"></div><div><label>혈액형 (선택)</label><select id="blood"><option value="">안 씀</option><option>A</option><option>B</option><option>O</option><option>AB</option></select></div>
@@ -46,7 +46,7 @@ footer{max-width:1000px;margin:0 auto;padding:16px;color:var(--mut);font-size:12
 <div id="prefs_reg"></div>
 <label style="display:flex;gap:8px;align-items:center;margin-top:14px;font-weight:500;font-size:14px;color:var(--fg)"><input type="checkbox" id="consent" checked style="width:auto"> 전사 익명 매칭에 포함 (별명·부서·연령대만 노출)</label>
 <button class="p" onclick="register()">등록</button> <span id="regmsg" class="err"></span>
-</div><div id="regout"></div></section>
+</div><div id="regout"></div><div id="admin"></div></section>
 
 <section id="me"><div id="today"></div><div id="meout"><div class="card">등록 후 볼 수 있어요.</div></div><div id="reading"></div><div id="saju"></div>
 <div class="card"><h2>취미 · 성향 수정</h2><div id="prefs_me"></div><button class="p" onclick="savePrefs()">저장</button> <span id="prefmsg" class="mut"></span></div>
@@ -76,7 +76,7 @@ const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=
 const jsid=s=>String(s??'').replace(/[^0-9A-Za-z_-]/g,'');
 const EL=['목','화','토','금','수'],ELW={목:'기획·성장',화:'추진·표현',토:'조율·안정',금:'원칙·분석',수:'유연·지식'},ELC={목:'var(--mok)',화:'var(--hwa)',토:'var(--to)',금:'var(--geum)',수:'var(--su)'},TENW={비겁:'협업',식상:'창의',재성:'실행',관성:'규율',인성:'학습'};
 const cssc=v=>getComputedStyle(document.documentElement).getPropertyValue(v.slice(4,-1)).trim();
-let me=JSON.parse(localStorage.tbm||'null'),META=null;const HASH=location.hash.slice(1);
+let me=JSON.parse(localStorage.tbm||'null'),META=null,ACCT=null;const HASH=location.hash.slice(1);
 {const q=new URLSearchParams(location.search);if(q.get('id')&&q.get('token')){me={id:q.get('id'),token:q.get('token'),name:q.get('name')||'',dept:q.get('dept')||'',alias:q.get('alias')||''};localStorage.tbm=JSON.stringify(me);history.replaceState(null,'',location.pathname+location.hash)}}
 for(let h=0;h<24;h++)$('#hour').insertAdjacentHTML('beforeend',`<option value="${h}">${h}시</option>`);
 // ── 오행 오각형 레이더 (SVG) ──
@@ -98,7 +98,9 @@ const axes=(n,cur={})=>META.axes.map(a=>`<div class="ax"><span class="mut">${a}<
 const readPrefs=pre=>({hobbies:[...document.querySelectorAll(`input[name=${pre}_h]:checked`)].map(x=>x.value),
  traits:Object.fromEntries(META.axes.map(a=>[a,+(document.querySelector(`input[name=${pre}_t_${a}]:checked`)?.value||0)])),
  wants:Object.fromEntries(META.axes.map(a=>[a,+(document.querySelector(`input[name=${pre}_w_${a}]:checked`)?.value||0)]))});
-api('api/meta').then(async m=>{META=m;$('#prefs_reg').innerHTML=prefsHTML('r');
+const ACCT_P=api('api/account').then(a=>{ACCT=a;$('#acct').innerHTML=a.dept?`<b style="color:var(--fg)">${esc(a.name)}</b> · ${esc(a.dept)}`:`<span class="err">${esc(a.no_dept||'포털 계정이 없습니다')}</span>`;$('#reg button.p').disabled=!a.dept;if(a.admin)loadAdmin();
+ if(a.mine&&me?.id!==a.mine.id){me={...a.mine,name:a.name,dept:a.dept};localStorage.tbm=JSON.stringify(me)}}).catch(e=>$('#acct').textContent=e.message);
+api('api/meta').then(async m=>{await ACCT_P;META=m;$('#prefs_reg').innerHTML=prefsHTML('r');
  if(me){try{Object.assign(me,await api('api/me'));localStorage.tbm=JSON.stringify(me);$('#prefs_me').innerHTML=prefsHTML('m',me)}catch(e){localStorage.removeItem('tbm');me=null}}});
 api('api/status').then(s=>{const p=$('#llm');p.classList.toggle('on',s.llm);p.innerHTML=`<i></i>${s.llm?`LLM 연결됨 · ${esc(s.model)}${s.model_found===false?' (모델 없음)':''}`:'LLM 미연결 · 규칙 문장으로 대체'}`});
 const prof=(p,title)=>`<div class="card"><h2>${title}</h2><div class="hero">${radar(p.elements,220,true,ELC[p.dm_el])}<div>
@@ -106,8 +108,8 @@ const prof=(p,title)=>`<div class="card"><h2>${title}</h2><div class="hero">${ra
  <label>팀에서의 역할 분포</label><div>${Object.entries(p.ten_gods).map(([k,v])=>`<span class="tag">${TENW[k]} <b>${v}</b></span>`).join('')}</div>
  ${p.lacking?.length?`<p class="mut" style="margin:10px 0 0">비어 있는 성향: ${p.lacking.map(e=>`${e} ${ELW[e]}`).join(', ')} — 이걸 가진 사람과 붙으면 균형이 맞습니다.</p>`:''}</div></div></div>`;
 async function register(){$('#regmsg').textContent='';const g=id=>$('#'+id).value;
- try{const r=await api('api/register',{name:g('name'),dept:g('dept'),year:g('year'),month:g('month'),day:g('day'),hour:g('hour'),minute:g('minute'),mbti:g('mbti'),blood:g('blood'),gender:g('gender'),consent_global:$('#consent').checked,...readPrefs('r')});
-  me={id:r.id,token:r.token,name:g('name'),dept:g('dept'),alias:r.alias,pillars:r.pillars,mbti:g('mbti'),blood:g('blood'),zodiac:r.zodiac,...readPrefs('r'),...r.profile};localStorage.tbm=JSON.stringify(me);$('#prefs_me').innerHTML=prefsHTML('m',me);
+ try{const r=await api('api/register',{year:g('year'),month:g('month'),day:g('day'),hour:g('hour'),minute:g('minute'),mbti:g('mbti'),blood:g('blood'),gender:g('gender'),consent_global:$('#consent').checked,...readPrefs('r')});
+  me={id:r.id,token:r.token,name:ACCT?.name||'',dept:ACCT?.dept||'',alias:r.alias,pillars:r.pillars,mbti:g('mbti'),blood:g('blood'),zodiac:r.zodiac,...readPrefs('r'),...r.profile};localStorage.tbm=JSON.stringify(me);$('#prefs_me').innerHTML=prefsHTML('m',me);
   $('#regout').innerHTML=`<div class="card"><h2>등록 완료 · 별명 <span style="color:var(--acc)">${esc(r.alias)}</span></h2><p class="mut">사주 8자 (지금만 표시, 저장 안 됨)</p><div class="big" style="font-size:26px">${r.pillars.map(x=>x||'시주 모름').join(' · ')}</div></div>`+prof(me,'내 성향')+sajuCard({...r.profile,birth_year:+g('year')});
  }catch(e){$('#regmsg').textContent=e.message}}
 function sajuCard(p){if(!p.tens)return '';const N=['년','월','일','시'],cols=N.map((n,i)=>{const g=p.pillars[i],t=p.tens[n];if(!g)return `<div><div class="h">${n}주</div><div class="g" style="color:var(--mut)">--</div><div class="s">시각 모름</div></div>`;
@@ -127,6 +129,12 @@ async function showMe(){if(!me)return;$('#meout').innerHTML=prof(me,`${esc(me.na
   ${t.llm?'':'<p class="mut" style="margin:10px 0 0">LLM 미연결이라 규칙 문장입니다.</p>'}</div>`}).catch(e=>$('#today').innerHTML=`<div class="card err">${esc(e.message)}</div>`);
  api('api/reading').then(r=>{const [w,m]=r.reading.split('\n\n§\n\n');$('#reading').innerHTML=`<div class="card"><h2>일하는 스타일</h2><p style="white-space:pre-line;margin:0">${esc(w)}</p></div>`+(m?`<div class="card"><h2>명리 해설</h2><p style="white-space:pre-line;margin:0">${esc(m)}</p></div>`:'')+reportCard()}).catch(e=>$('#reading').innerHTML=`<div class="card err">${esc(e.message)}</div>`+reportCard())}
 function reportCard(){setTimeout(fortunePoll,0);return `<div class="card" id="rcard"><h2>📖 사주 풀이 리포트</h2><p class="mut" style="margin:0 0 8px">성격·오행부터 <b>직업·재물·학업·연애·결혼·건강·인간관계</b>, 대운(10년 운)·올해·내년·월별 운세, 개운법까지 15개 주제를 로컬 LLM이 쉬운 말로 자세히 풀어 써요. 목차와 검색으로 필요한 해석만 골라 볼 수 있어요. 성별은 연애·결혼운 계산에만 쓰고 계정에는 저장하지 않아요.</p><div id="rbody" class="mut">불러오는 중…</div></div>`}
+// 관리자: 포털 계정에 연결되지 않은 예전 등록 — 계정 연결(포털 아이디) 또는 지우기
+async function loadAdmin(){try{const l=(await api('api/admin/people')).filter(p=>!p.account);
+ $('#admin').innerHTML=`<div class="card"><h2>관리자 · 계정 미연결 등록 ${l.length}건</h2><p class="mut" style="margin:0 0 8px">이름+부서가 포털 계정과 정확히 한 건 같지 않아 연결되지 않은 예전 등록입니다. 본인 계정 아이디로 연결하거나 지우세요.</p>${l.map(p=>`<div class="row" style="align-items:center"><div>${esc(p.name)} · ${esc(p.dept)} <span class="mut">${esc(p.alias)} · ${esc(p.created||'')}</span></div><div><input data-acc="${esc(p.id)}" placeholder="포털 아이디" style="width:140px"> <button class="p g" data-link="${esc(p.id)}">연결</button> <button class="p d" data-del="${esc(p.id)}">지우기</button></div></div>`).join('')}</div>`;
+ $('#admin').querySelectorAll('[data-link]').forEach(b=>b.onclick=async()=>{try{await api('api/admin/fix',{pid:b.dataset.link,action:'link',account:$('#admin').querySelector(`[data-acc="${b.dataset.link}"]`).value.trim()});loadAdmin()}catch(e){alert(e.message)}});
+ $('#admin').querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('이 등록을 지울까요?'))return;try{await api('api/admin/fix',{pid:b.dataset.del,action:'delete'});loadAdmin()}catch(e){alert(e.message)}});
+}catch(e){$('#admin').innerHTML=''}}
 let fpTimer=null;
 async function fortunePoll(){const el=$('#rbody');if(!el||!me)return;let s;try{s=await api('api/fortune')}catch(e){el.textContent=e.message;return}
  const g=s.gender||s.guess_gender||'';
