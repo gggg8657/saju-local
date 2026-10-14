@@ -798,4 +798,4 @@ if __name__ == "__main__" and sys.argv[1:] == ["--link-accounts"]:  # 예전 등
     print(json.dumps(link_accounts(), ensure_ascii=False)); sys.exit(0)
 if __name__ == "__main__":
     print(f"팀 밸런스 맵 → http://localhost:{PORT}  (api={LLM_API} base={BASE} model={MODEL})  {_SIG}")
-    ThreadingHTTPServer((os.environ.get("BIND", ""), PORT), H).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), __import__("portal_auth").install(H, "saju-local")).serve_forever()
