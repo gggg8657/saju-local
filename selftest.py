@@ -103,6 +103,9 @@ _old = [{**app.load()[0], "id": "0000000" + str(k), "token": "t" * 32, "name": n
 for o in _old: o.pop("account", None)
 app.save(app.load() + _old)
 assert app.link_accounts() == {"linked": 1, "unlinked": 2, "already": 1}
+from urllib.parse import quote as _q
+_ids = lambda u: {n["id"] for n in json.loads(_call("/api/graph?dept=" + _q("시험부서"), user=u)[1])["nodes"]}
+assert "00000001" not in _ids("u4") and "00000001" in _ids("owner"), "미연결 등록은 관리자에게만 보여야 함"
 _hu = {"X-Saju-Id": "00000001", "X-Saju-Token": "t" * 32}
 assert _call("/api/delete", {}, hdr=_hu, user="u1")[0] == 403 and _call("/api/prefs", {"hobbies": []}, hdr=_hu, user="u1")[0] == 403
 assert _call("/api/admin/people", user="u1")[0] == 403 and _call("/api/admin/fix", {"pid": "00000001", "action": "delete"}, user="u1")[0] == 403

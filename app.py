@@ -473,7 +473,7 @@ def find(people, pid):
 
 def match(pid, token, scope, filters):
     people, me = auth(pid, token)
-    cands = [p for p in people if p["id"] != pid]
+    cands = [p for p in people if p["id"] != pid and (p.get("account") or cur()["admin"])]  # 미연결 등록은 매칭 후보에서 뺌
     if scope == "dept":
         a = cur()
         if not a["dept"]: raise PermissionError(NO_DEPT)
@@ -501,7 +501,8 @@ def graph(dept, viewer=None, owner=False):
         if not a["dept"]: raise PermissionError(NO_DEPT)
         if dept != a["dept"] or not mine(everyone):
             raise PermissionError("부서 지도는 포털 계정 부서의 것만, 그 계정으로 등록한 뒤 볼 수 있습니다")
-    people = [p for p in everyone if (p["dept"] == dept if dept else p.get("consent_global"))]
+    shown = everyone if owner else [p for p in everyone if p.get("account")]  # 미연결(주인 없는) 등록은 관리자에게만
+    people = [p for p in shown if (p["dept"] == dept if dept else p.get("consent_global"))]
     nodes = [public(p, reveal=bool(dept)) for p in people]
     edges = []
     for i in range(len(people)):
