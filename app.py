@@ -5,6 +5,7 @@ import glob, json, math, os, re, secrets, sys, threading, urllib.error, urllib.r
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, quote, urlparse
+import portal_auth  # 포털 서명 확인 관문·오류 문장 정리(원본 agent-page-portal/sdk/portal_auth.py)
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DATA = os.environ.get("WORKSPACE") or os.path.join(ROOT, "data")  # 포털이 AGENT_DATA/<도구> 로 모아 줌
@@ -755,13 +756,14 @@ class H(BaseHTTPRequestHandler):
             if u.path == "/api/fortune": return self._send(fortune_status(*self._cred()))
             if u.path == "/report": return self._report(*self._cred(), q.get("download"))
             if u.path == "/api/meta": return self._send({"axes": AXES, "labels": AXIS_LABEL, "hobbies": HOBBIES})
+            if u.path.startswith("/api/"): return self._send({"error": "not found"}, 404)   # 없는 API 경로는 화면 대신 JSON 404
             with open(os.path.join(ROOT, "ui.html"), encoding="utf-8") as f: return self._send(signed(f.read()).encode(), ctype="text/html")
         except PermissionError as e:
             self._send({"error": str(e)}, 403)
         except ValueError as e:
             self._send({"error": str(e)}, 400)
         except Exception as e:
-            self._send({"error": f"{type(e).__name__}: {e}"}, 500)
+            self._send({"error": portal_auth.scrub(f"{type(e).__name__}: {e}")}, 500)
 
     def do_POST(self):
         CUR.acct = account((self.headers.get("X-Agent-User") or "owner").strip())
@@ -791,11 +793,11 @@ class H(BaseHTTPRequestHandler):
         except (ValueError, KeyError) as e:
             self._send({"error": f"입력 오류: {e}"}, 400)
         except Exception as e:
-            self._send({"error": f"{type(e).__name__}: {e}"}, 500)
+            self._send({"error": portal_auth.scrub(f"{type(e).__name__}: {e}")}, 500)
 
 
 if __name__ == "__main__" and sys.argv[1:] == ["--link-accounts"]:  # 예전 등록을 포털 계정에 연결(한 번) — 개수만 출력
     print(json.dumps(link_accounts(), ensure_ascii=False)); sys.exit(0)
 if __name__ == "__main__":
     print(f"팀 밸런스 맵 → http://localhost:{PORT}  (api={LLM_API} base={BASE} model={MODEL})  {_SIG}")
-    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), __import__("portal_auth").install(H, "saju-local")).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), portal_auth.install(H, "saju-local")).serve_forever()
