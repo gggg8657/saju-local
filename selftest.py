@@ -78,6 +78,7 @@ _db.executemany("INSERT INTO users(id,name,dept) VALUES(?,?,?)", [("u1", "갑", 
 _base = {"year": 1990, "month": 5, "day": 3, "hour": 10}
 _a = json.loads(_call("/api/register", {**_base, "name": "사칭", "dept": "다른부서"}, user="u1")[1]); _b = json.loads(_call("/api/register", _base, user="u2")[1])
 assert [(p["name"], p["dept"], p["account"]) for p in app.load()] == [("갑", "시험부서", "u1"), ("을", "다른부서", "u2")], "요청의 이름·부서를 쓰면 안 됨"
+assert [p["consent_global"] for p in app.load()] == [False, False], "전체 공개 동의는 기본 꺼짐(값을 안 보내면 회사 지도에 안 나감)"
 assert _call("/api/register", _base, user="u3")[0] == 403 and _call("/api/register", _base, user="owner")[0] == 403, "부서 없는 계정 등록"
 _ha = {"X-Saju-Id": _a["id"], "X-Saju-Token": _a["token"]}
 assert _call("/api/me", hdr=_ha, user="u1")[0] == 200
@@ -93,7 +94,8 @@ _g = json.loads(_call("/api/graph?dept=", user="u3")[1]); assert _g["depts"] == 
 assert _call("/api/today", hdr=_ha, user="u1")[0] == 200
 _tc = os.path.join(_tmp, "today-2000-01-01.json"); json.dump({_a["id"]: {"text": "x"}, "other": {"text": "y"}}, open(_tc, "w"))
 os.makedirs(app.FORTUNE, exist_ok=True); open(os.path.join(app.FORTUNE, _a["id"] + ".json"), "w").write("{}")
-_a2 = json.loads(_call("/api/register", _base, user="u1")[1])  # 다시 등록 = 바꿔 끼움(계정당 1건)
+_a2 = json.loads(_call("/api/register", {**_base, "consent_global": True}, user="u1")[1])  # 다시 등록 = 바꿔 끼움(계정당 1건)
+assert app.find(app.load(), _a2["id"])["consent_global"] is True, "명시 동의는 그대로 저장"
 assert sum(p.get("account") == "u1" for p in app.load()) == 1 and _call("/api/me", hdr=_ha, user="u1")[0] == 400
 assert json.load(open(_tc)) == {"other": {"text": "y"}} and not os.path.exists(os.path.join(app.FORTUNE, _a["id"] + ".json"))
 _ha = {"X-Saju-Id": _a2["id"], "X-Saju-Token": _a2["token"]}

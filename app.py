@@ -456,7 +456,7 @@ def register(req):
     rec = {"id": secrets.token_hex(4), "token": secrets.token_hex(16), "name": name, "dept": dept,
            "age_band": f"{(age // 10) * 10}대", "alias": f"{ADJ[seed % len(ADJ)]} {ANI[seed // len(ADJ)]}",
            "mbti": mbti or None, "blood": blood or None, "zodiac": zodiac(m, d), "hour_known": hh is not None,
-           "day_branch": pillars[2][1], "consent_global": bool(req.get("consent_global", True)),
+           "day_branch": pillars[2][1], "consent_global": req.get("consent_global") is True,  # 전체 공개는 명시 동의만(2026-10-19~ 새 등록 기본 꺼짐, 기존 등록은 그대로)
            "created": date.today().isoformat(), **prefs(req), **p}
     # 생년월일시 원본·성별은 저장 안 함. 4주(8자)·분석 결과·출생 연도만 남김 (8자로 생일 역산은 가능 — README 참고)
     rec["account"] = a["uid"]
