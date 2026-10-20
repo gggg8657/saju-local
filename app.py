@@ -138,7 +138,7 @@ def today_rule(p, day=None):
 def current_daeun(p):
     d = p.get("daeun")
     if not d: return None
-    age = date.today().year - int(p.get("birth_year", 0)) if p.get("birth_year") else None
+    age = today_kst().year - int(p.get("birth_year", 0)) if p.get("birth_year") else None
     if age is None: return None
     cur = None
     for x in d["list"]:
@@ -375,6 +375,11 @@ def now_kst():
     return datetime.utcnow() + timedelta(hours=9)
 
 
+def today_kst():
+    """나이·올해·만든 날 등 달력 날짜는 한국 날짜 — 서버는 UTC"""
+    return now_kst().date()
+
+
 def create_bungae(req):
     people = load(); host = find(people, req.get("id"))
     if not host or not owns(host, req.get("token")): raise ValueError("권한 없음")
@@ -435,7 +440,7 @@ def register(req):
     if not a["dept"] or a["uid"] == "owner": raise PermissionError(NO_DEPT)
     name, dept = a["name"], a["dept"]
     y, m, d = int(req["year"]), int(req["month"]), int(req["day"])
-    if not 1920 <= y <= date.today().year: raise ValueError("연도 범위")
+    if not 1920 <= y <= today_kst().year: raise ValueError("연도 범위")
     hh = req.get("hour"); hh = None if hh in (None, "", "unknown") else int(hh)
     mi = int(req.get("minute") or 0)
     if hh is not None and not 0 <= hh <= 23: raise ValueError("시각 범위")
@@ -452,12 +457,12 @@ def register(req):
     p["lmt"] = r["lmt"].strftime("%H:%M") if hh is not None else None
     p["birth_year"] = y  # 대운 나이 계산용
     seed = secrets.randbelow(len(ADJ) * len(ANI))
-    age = date.today().year - y
+    age = today_kst().year - y
     rec = {"id": secrets.token_hex(4), "token": secrets.token_hex(16), "name": name, "dept": dept,
            "age_band": f"{(age // 10) * 10}대", "alias": f"{ADJ[seed % len(ADJ)]} {ANI[seed // len(ADJ)]}",
            "mbti": mbti or None, "blood": blood or None, "zodiac": zodiac(m, d), "hour_known": hh is not None,
            "day_branch": pillars[2][1], "consent_global": req.get("consent_global") is True,  # 전체 공개는 명시 동의만(2026-10-19~ 새 등록 기본 꺼짐, 기존 등록은 그대로)
-           "created": date.today().isoformat(), **prefs(req), **p}
+           "created": today_kst().isoformat(), **prefs(req), **p}
     # 생년월일시 원본·성별은 저장 안 함. 4주(8자)·분석 결과·출생 연도만 남김 (8자로 생일 역산은 가능 — README 참고)
     rec["account"] = a["uid"]
     with LOCK:

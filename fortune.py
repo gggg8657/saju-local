@@ -3,8 +3,13 @@
    a: saju.analyze 결과 + pillars(간지 문자열)·raw(인덱스)·birth_year·age·gender(M/F/None)·daeun 이 들어 있는 dict."""
 import re
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 import saju
+
+
+def _today():
+    """올해·오늘은 한국 날짜 — 서버는 UTC(한국은 일광절약시간 없음)"""
+    return (datetime.now(timezone.utc) + timedelta(hours=9)).date()
 from saju import STEMS, BRANCHES, EL, STEM_EL, BR_EL, TEN, ganzi, branch_rel, unseong
 
 EL_PLAIN = {"목": "나무(성장·기획·인자함)", "화": "불(열정·표현·예의)", "토": "흙(안정·신용·중재)", "금": "쇠(결단·원칙·의리)", "수": "물(지혜·유연·소통)"}
@@ -125,7 +130,7 @@ def love_facts(a):
 
 def facts(a, today=None):
     """섹션 키 → 근거 문장 리스트"""
-    today = today or date.today(); Y = today.year
+    today = today or _today(); Y = today.year
     raw = raw_of(a); ds, db = raw[2][0], raw[2][1]
     tp = ten_power(a); shown, hidden = ten10_list(a); ss = sinsal(a)
     strong = sorted(tp, key=tp.get, reverse=True)
@@ -188,7 +193,7 @@ def facts(a, today=None):
     return F, lv
 
 
-Y0 = date.today().year
+Y0 = _today().year
 # (키, 제목, 쓰는 법) — 순서가 곧 목차
 SECTIONS = [
     ("summary", "한눈에 보는 내 사주", "이 사람의 사주 전체를 처음 보는 사람도 이해하게 요약한다. 소제목: '나는 어떤 사람인가', '내 사주의 강점', '조심할 점', '인생 전체 흐름 한 줄'. 1000~1300자."),

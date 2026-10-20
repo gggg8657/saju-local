@@ -57,7 +57,7 @@ def build(p):
     a = saju.analyze(r["pillars"], p["gender"], r["utc"], r["prev_term"], r["next_term"])
     a.update(pillars=[ganzi(x) for x in r["pillars"]], raw=r["pillars"], day_branch=r["pillars"][2][1], birth_year=p["y"], gender=p["gender"],
              lmt=r["lmt"].strftime("%H:%M") if p["hh"] is not None else None, mbti=p["mbti"], blood=p["blood"], name=p["name"],
-             zodiac=zodiac(p["m"], p["d"]), id=p["name"], age=date.today().year - p["y"],
+             zodiac=zodiac(p["m"], p["d"]), id=p["name"], age=app.today_kst().year - p["y"],
              prev_term=r["prev_term"], next_term=r["next_term"], utc=r["utc"])
     return a
 
@@ -311,7 +311,7 @@ mark{background:#FFE58A;border-radius:3px;padding:0 1px}footer{color:#6B7280;fon
 GROUPS = [("기본", ["wonguk", "summary", "nature", "elements"]), ("분야별 운", ["career", "money", "study", "love", "marriage", "health", "people"]),
           ("시기별 운", ["daeun", "year", "next_year", "monthly"]), ("더 보기", ["luck", "match"])]
 CHIPS = [("career", "💼 직업운"), ("money", "💰 재물운"), ("study", "📚 학업·시험운"), ("love", "💕 연애운"), ("marriage", "💍 결혼운"), ("health", "🩺 건강운"),
-         ("people", "🤝 인간관계"), ("year", f"📅 {date.today().year}년 운세"), ("monthly", "🗓 월별 운세"), ("daeun", "🧭 대운"), ("luck", "🍀 개운법")]
+         ("people", "🤝 인간관계"), ("year", f"📅 {app.today_kst().year}년 운세"), ("monthly", "🗓 월별 운세"), ("daeun", "🧭 대운"), ("luck", "🍀 개운법")]
 JS = """const q=document.getElementById('q'),secs=[...document.querySelectorAll('main section')],links=[...document.querySelectorAll('nav.toc a')],hits=document.getElementById('hits');
 const orig=new Map(secs.map(s=>[s,s.innerHTML]));
 q.addEventListener('input',()=>{const w=q.value.trim();let n=0;secs.forEach(s=>{s.innerHTML=orig.get(s);const ok=!w||s.textContent.includes(w);s.classList.toggle('hide',!ok);
@@ -380,7 +380,7 @@ def html_report(a, fits, cross, cross_title="명단 내 궁합", text=None):
     chips = '<div class="chips">' + "".join(f'<a href="#{k}">{t}</a>' for k, t in CHIPS) + '</div>'
     return app.signed(f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{E(a['name'])} 사주 리포트</title><style>{CSS}</style></head><body>
 <div class="wrap"><nav class="toc"><input id="q" type="search" placeholder="찾기: 연애, 이직, 2027, 건강…" aria-label="리포트 안에서 찾기"><div id="hits"></div>{toc}</nav><main>
-<h1>{E(a['name'])}님의 사주 풀이<small>{' · '.join(x or '시주 모름' for x in a['pillars'])}{' · 진태양시 ' + a['lmt'] if a['lmt'] else ''} · {a['mbti'] or '-'} · {a['blood'] or '-'}형 · {a['zodiac']}자리{' · ' + ('남성' if a.get('gender') == 'M' else '여성') if a.get('gender') else ''} · {date.today().isoformat()} 작성</small></h1>
+<h1>{E(a['name'])}님의 사주 풀이<small>{' · '.join(x or '시주 모름' for x in a['pillars'])}{' · 진태양시 ' + a['lmt'] if a['lmt'] else ''} · {a['mbti'] or '-'} · {a['blood'] or '-'}형 · {a['zodiac']}자리{' · ' + ('남성' if a.get('gender') == 'M' else '여성') if a.get('gender') else ''} · {app.today_kst().isoformat()} 작성</small></h1>
 {chips}{ez_html}{''.join(body)}
 <footer>절기는 VSOP87 기반 ±1분, 진태양시·서머타임·표준시 이력 보정. 신강약·용신·격국·신살은 규칙 계산이라 유파에 따라 다를 수 있고, 풀이 글은 로컬 LLM이 계산 근거를 바탕으로 쓴 것입니다. 과학적 근거 없음 · 재미로 보세요 · 건강은 의학적 진단이 아닙니다.</footer>
 </main></div><script>{JS}</script></body></html>""")
@@ -407,7 +407,7 @@ def record_view(rec, gender=None):
     if rec.get("reading"):
         for title, part in zip(("일하는 스타일", "명리 해설"), rec["reading"].split("\n\n§\n\n")):
             ez.append((title, [x.strip() for x in part.split("\n") if x.strip()]))
-    return {**rec, "raw": raw, "age": date.today().year - rec["birth_year"], "gender": gender, "easy": ez}
+    return {**rec, "raw": raw, "age": app.today_kst().year - rec["birth_year"], "gender": gender, "easy": ez}
 
 
 def from_record(rec, team, gender=None, text=None):
