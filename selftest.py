@@ -115,6 +115,29 @@ assert _call("/api/admin/fix", {"pid": "00000001", "action": "delete"}, user="ow
 assert _call("/api/admin/fix", {"pid": "00000002", "action": "link", "account": "u2"}, user="owner")[0] == 400, "이미 프로필 있는 계정에 연결"
 try: urllib.request.urlopen(urllib.request.Request(_B + "/api/register", b"not json")); raise AssertionError("잘못된 JSON 통과")
 except urllib.error.HTTPError as e: assert e.code == 400
+# 관리자 계정 분리(포털 서명 관문): 관리자 두 계정은 자기 아이디로 각자 프로필, 관리 권한은 서명된 역할로. 위장·옮겨 붙인 역할은 권한 없음
+import portal_auth
+_db = sqlite3.connect(app.PORTAL_DB); _db.executemany("INSERT INTO users(id,name,dept) VALUES(?,?,?)", [("adm1", "관일", "시험부서"), ("adm2", "관이", "다른부서")]); _db.commit(); _db.close()
+os.environ["PORTAL_TOOL_KEY"] = "selftest-key-" + "x" * 30
+portal_auth.install(app.H, "saju-local")  # 클래스를 고침 — 떠 있는 서버의 다음 요청부터 관문
+_s = lambda u, role=None: portal_auth.sign(u, "saju-local", role=role)
+assert _call("/api/account", user="adm1")[0] == 401, "서명 없음"
+_r1 = json.loads(_call("/api/register", _base, hdr=_s("adm1", "admin"))[1]); _r2 = json.loads(_call("/api/register", _base, hdr=_s("adm2", "admin"))[1])
+_acc = {u: json.loads(_call("/api/account", hdr=_s(u, "admin"))[1]) for u in ("adm1", "adm2")}
+assert _acc["adm1"]["mine"]["id"] == _r1["id"] and _acc["adm2"]["mine"]["id"] == _r2["id"] and _r1["id"] != _r2["id"], "관리자 계정마다 자기 프로필"
+assert _acc["adm1"]["admin"] and _acc["adm2"]["admin"] and (_acc["adm1"]["name"], _acc["adm2"]["name"]) == ("관일", "관이")
+assert {p["account"] for p in app.load() if p["id"] in (_r1["id"], _r2["id"])} == {"adm1", "adm2"}
+for _u in ("adm1", "adm2"):
+    assert _call("/api/admin/people", hdr=_s(_u, "admin"))[0] == 200
+    assert "00000002" in {n["id"] for n in json.loads(_call("/api/graph?dept=" + _q("다른부서"), hdr=_s(_u, "admin"))[1])["nodes"]}, "미연결 등록은 관리자에게 보임"
+assert _call("/api/admin/fix", {"pid": "00000002", "action": "delete"}, hdr=_s("adm2", "admin"))[0] == 200
+_forged = [{**_s("u1"), "X-Agent-Role": "admin"}, {**_s("u1"), "X-Agent-Role": "admin", "X-Agent-Role-Auth": _s("adm1", "admin")["X-Agent-Role-Auth"]}]
+for _h in [_s("u1")] + _forged:
+    assert not json.loads(_call("/api/account", hdr=_h)[1])["admin"]
+    assert _call("/api/admin/people", hdr=_h)[0] == 403 and _call("/api/graph?dept=" + _q("다른부서"), hdr=_h)[0] == 403
+_c, _g = _call("/api/graph?dept=" + _q("시험부서"), hdr=_s("owner")); assert _c == 200 and _call("/api/admin/people", hdr=_s("owner"))[0] == 200
+assert json.loads(_call("/api/account", hdr=_s("owner"))[1])["mine"] is None, "owner 는 계정 프로필 없음"
+os.environ.pop("PORTAL_TOOL_KEY")
 _srv.shutdown(); import shutil; shutil.rmtree(_tmp, ignore_errors=True)
 
 print("selftest ok")

@@ -232,10 +232,11 @@ CUR = threading.local()  # 요청마다 handler 가 CUR.acct 를 채움(Threadin
 NO_DEPT = "포털 계정에 부서가 정해져 있지 않습니다 — 포털 '내 정보'에서 부서를 신청해 승인받은 뒤 쓸 수 있어요"
 
 
-def account(uid):
-    """X-Agent-User → {uid, name, dept, admin}. 포털 DB(users)를 읽기 전용으로 — 못 읽거나 비활성 계정이면 부서 없음."""
+def account(uid, admin=False):
+    """X-Agent-User → {uid, name, dept, admin}. 포털 DB(users)를 읽기 전용으로 — 못 읽거나 비활성 계정이면 부서 없음.
+    admin = owner(로컬 주인 토큰·단독 실행) 또는 포털이 서명한 관리자 역할(portal_auth.is_admin) — 관리자 계정도 프로필 주인은 자기 아이디."""
     import sqlite3
-    a = {"uid": uid, "name": "", "dept": "", "admin": uid == "owner"}
+    a = {"uid": uid, "name": "", "dept": "", "admin": uid == "owner" or bool(admin)}
     if uid == "owner" or not os.path.exists(PORTAL_DB): return a
     try:
         c = sqlite3.connect(f"file:{quote(PORTAL_DB)}?mode=ro", uri=True, timeout=5)
@@ -732,7 +733,8 @@ class H(BaseHTTPRequestHandler):
                 body.get("token") or self.headers.get("X-Saju-Token") or None)
 
     def _owner(self):
-        return (self.headers.get("X-Agent-User") or "owner").strip() == "owner"
+        """관리자(owner 또는 서명된 관리자 역할) — 모든 부서 지도"""
+        return portal_auth.is_admin(self)
 
     def _viewer(self):
         pid, token = self._cred()
@@ -745,7 +747,7 @@ class H(BaseHTTPRequestHandler):
         return self._send(signed(body.decode()).encode(), ctype="text/html", filename=f"사주리포트_{find(load(), pid)['name']}.html" if download else None)
 
     def do_GET(self):
-        CUR.acct = account((self.headers.get("X-Agent-User") or "owner").strip())
+        CUR.acct = account(portal_auth.user(self), portal_auth.is_admin(self))
         u = urlparse(self.path); q = {k: v[0] for k, v in parse_qs(u.query).items()}
         q.pop("id", None); q.pop("token", None)  # 쿼리의 id·token 은 무시
         try:
@@ -771,7 +773,7 @@ class H(BaseHTTPRequestHandler):
             self._send({"error": portal_auth.scrub(f"{type(e).__name__}: {e}")}, 500)
 
     def do_POST(self):
-        CUR.acct = account((self.headers.get("X-Agent-User") or "owner").strip())
+        CUR.acct = account(portal_auth.user(self), portal_auth.is_admin(self))
         raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
         try:
             if self.path == "/report":  # 화면이 새 창으로 여는 리포트 — 폼 본문(id·token·download)으로 받는다
